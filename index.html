@@ -53,9 +53,56 @@
   .campaign-detail { display:none; }
   .campaign-detail.open { display:block; }
   @media (max-width:640px) {
+    .camp-right { display:none !important; }
+    .camp-right-mobile { display:flex !important; }
+
+    /* Summary grids */
     .grid-3 { grid-template-columns:repeat(2,1fr) !important; }
     .grid-5 { grid-template-columns:repeat(2,1fr) !important; }
     .grid-2 { grid-template-columns:1fr !important; }
+
+    /* Tabs — scrollable row instead of squished flex */
+    .tabs-row { overflow-x:auto; -webkit-overflow-scrolling:touch; gap:4px; flex-wrap:nowrap !important; }
+    .tab-btn  { flex:0 0 auto !important; font-size:11px !important; padding:8px 10px !important; }
+
+    /* Date range pills */
+    .range-row { flex-wrap:wrap !important; gap:6px !important; }
+
+    /* Campaign row — stack badge/name block above ROAS */
+    .camp-row-inner {
+      flex-wrap:wrap !important;
+      gap:8px !important;
+      padding:12px 14px !important;
+    }
+    .camp-row-inner .camp-right {
+      width:100%;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+    }
+
+    /* Badge text smaller on mobile */
+    .badge-pill { font-size:9px !important; padding:3px 8px !important; }
+
+    /* Campaign name — allow wrap on mobile */
+    .camp-name { white-space:normal !important; font-size:12px !important; }
+
+    /* Detail panel padding */
+    .camp-detail-inner { padding:14px 14px !important; }
+
+    /* Metrics grid 2-col on mobile */
+    .metrics-grid { grid-template-columns:repeat(2,1fr) !important; }
+
+    /* Chart height smaller on mobile */
+    .chart-wrap { height:160px !important; }
+
+    /* Summary card numbers smaller */
+    .summary-num { font-size:20px !important; }
+    .summary-count { font-size:24px !important; }
+
+    /* Top bar */
+    .topbar-inner { padding:10px 14px !important; }
+    .topbar-title  { font-size:17px !important; }
   }
   button { font-family:'Nunito',sans-serif; }
 </style>
@@ -64,10 +111,10 @@
 <div id="app">
 
   <!-- TOP BAR -->
-  <div style="background:var(--navy);padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:58px;">
+  <div class="topbar-inner" style="background:var(--navy);padding:0 16px;display:flex;align-items:center;justify-content:space-between;height:58px;">
     <div style="display:flex;align-items:center;gap:12px;">
       <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--coral),var(--sage));"></div>
-      <span class="f-recoleta" style="color:white;font-weight:900;font-size:21px;letter-spacing:0.01em;">SCC Ads Dashboard</span>
+      <span class="f-recoleta topbar-title" style="color:white;font-weight:900;font-size:21px;letter-spacing:0.01em;">SCC Ads Dashboard</span>
     </div>
     <div style="display:flex;align-items:center;gap:10px;">
       <span id="sync-status" class="f-body" style="color:var(--teal);font-size:12px;font-weight:700;">⟳ Syncing…</span>
@@ -79,7 +126,7 @@
   <div style="max-width:960px;margin:0 auto;padding:24px 16px;">
 
     <!-- DATE RANGE -->
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:20px;flex-wrap:wrap;">
+    <div class="range-row" style="display:flex;align-items:center;gap:8px;margin-bottom:20px;flex-wrap:wrap;">
       <span class="f-body" style="font-size:12px;font-weight:800;color:var(--mid);letter-spacing:0.05em;text-transform:uppercase;margin-right:4px;">Viewing:</span>
       <button class="range-btn f-body" data-range="y"      onclick="setRange('y')"      style="padding:6px 14px;border-radius:20px;border:1.5px solid var(--light);background:white;color:var(--mid);font-weight:700;font-size:12px;cursor:pointer;transition:all 0.15s;">Yesterday</button>
       <button class="range-btn f-body" data-range="d3"     onclick="setRange('d3')"     style="padding:6px 14px;border-radius:20px;border:1.5px solid var(--light);background:white;color:var(--mid);font-weight:700;font-size:12px;cursor:pointer;transition:all 0.15s;">3-Day</button>
@@ -106,22 +153,22 @@
         <div style="display:flex;align-items:center;gap:6px;"><div style="width:24px;height:1.5px;background:#E8F0ED;border-radius:2px;border:1px dashed #C0CDD0;"></div><span class="f-body" style="font-size:11px;font-weight:700;color:var(--mid);">Break even (1.0)</span></div>
         <div style="display:flex;align-items:center;gap:6px;"><div style="width:24px;height:1.5px;background:rgba(244,162,74,0.33);border-radius:2px;border:1px dashed var(--orange);"></div><span class="f-body" style="font-size:11px;font-weight:700;color:var(--mid);">Scale threshold (1.4)</span></div>
       </div>
-      <div style="position:relative;height:200px;"><canvas id="trend-chart"></canvas></div>
+      <div class="chart-wrap" style="position:relative;height:200px;"><canvas id="trend-chart"></canvas></div>
     </div>
 
     <!-- SUMMARY ROW 1 -->
     <div class="grid-3" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px;">
       <div style="background:white;border-radius:14px;padding:16px 18px;border:1.5px solid var(--teal);box-shadow:0 2px 8px rgba(0,0,0,0.04);">
         <div class="f-body" style="font-size:10px;font-weight:800;color:var(--mid);letter-spacing:0.07em;text-transform:uppercase;margin-bottom:4px;">Total Spend</div>
-        <div class="f-recoleta" id="card-spend" style="font-size:26px;font-weight:900;color:var(--dark);line-height:1.1;">—</div>
+        <div class="f-recoleta" id="card-spend" class="summary-num" style="font-size:26px;font-weight:900;color:var(--dark);line-height:1.1;">—</div>
       </div>
       <div style="background:white;border-radius:14px;padding:16px 18px;border:1.5px solid var(--sage);box-shadow:0 2px 8px rgba(0,0,0,0.04);">
         <div class="f-body" style="font-size:10px;font-weight:800;color:var(--mid);letter-spacing:0.07em;text-transform:uppercase;margin-bottom:4px;">Hyros Revenue</div>
-        <div class="f-recoleta" id="card-hyros-rev" style="font-size:26px;font-weight:900;color:var(--dark);line-height:1.1;">—</div>
+        <div class="f-recoleta" id="card-hyros-rev" class="summary-num" style="font-size:26px;font-weight:900;color:var(--dark);line-height:1.1;">—</div>
       </div>
       <div id="card-roas-wrap" style="background:white;border-radius:14px;padding:16px 18px;border:1.5px solid var(--light);box-shadow:0 2px 8px rgba(0,0,0,0.04);">
         <div class="f-body" style="font-size:10px;font-weight:800;color:var(--mid);letter-spacing:0.07em;text-transform:uppercase;margin-bottom:4px;">Hyros ROAS</div>
-        <div class="f-recoleta" id="card-roas" style="font-size:26px;font-weight:900;line-height:1.1;">—</div>
+        <div class="f-recoleta" id="card-roas" class="summary-num" style="font-size:26px;font-weight:900;line-height:1.1;">—</div>
       </div>
     </div>
 
@@ -129,20 +176,20 @@
     <div class="grid-3" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:24px;">
       <div style="background:white;border-radius:14px;padding:14px 18px;border:1.5px solid var(--light);box-shadow:0 2px 8px rgba(0,0,0,0.04);display:flex;align-items:center;gap:14px;">
         <span style="font-size:24px;">📊</span>
-        <div><div class="f-recoleta" id="count-active" style="font-size:30px;font-weight:900;color:var(--dark);line-height:1;">—</div><div class="f-body" style="font-size:11px;font-weight:700;color:var(--mid);margin-top:2px;">Active Campaigns</div></div>
+        <div><div class="f-recoleta" id="count-active" class="summary-count" style="font-size:30px;font-weight:900;color:var(--dark);line-height:1;">—</div><div class="f-body" style="font-size:11px;font-weight:700;color:var(--mid);margin-top:2px;">Active Campaigns</div></div>
       </div>
       <div style="background:white;border-radius:14px;padding:14px 18px;border:1.5px solid var(--green);box-shadow:0 2px 8px rgba(0,0,0,0.04);display:flex;align-items:center;gap:14px;">
         <span style="font-size:24px;">🚀</span>
-        <div><div class="f-recoleta" id="count-scale" style="font-size:30px;font-weight:900;color:var(--green);line-height:1;">—</div><div class="f-body" style="font-size:11px;font-weight:700;color:var(--mid);margin-top:2px;">Ready to Scale</div></div>
+        <div><div class="f-recoleta" id="count-scale" class="summary-count" style="font-size:30px;font-weight:900;color:var(--green);line-height:1;">—</div><div class="f-body" style="font-size:11px;font-weight:700;color:var(--mid);margin-top:2px;">Ready to Scale</div></div>
       </div>
       <div id="attn-card" style="background:white;border-radius:14px;padding:14px 18px;border:1.5px solid var(--orange);box-shadow:0 2px 8px rgba(0,0,0,0.04);display:flex;align-items:center;gap:14px;">
         <span style="font-size:24px;">⚠️</span>
-        <div><div class="f-recoleta" id="count-attn" style="font-size:30px;font-weight:900;color:var(--orange);line-height:1;">—</div><div class="f-body" style="font-size:11px;font-weight:700;color:var(--mid);margin-top:2px;">Need Attention</div></div>
+        <div><div class="f-recoleta" id="count-attn" class="summary-count" style="font-size:30px;font-weight:900;color:var(--orange);line-height:1;">—</div><div class="f-body" style="font-size:11px;font-weight:700;color:var(--mid);margin-top:2px;">Need Attention</div></div>
       </div>
     </div>
 
     <!-- TABS -->
-    <div style="display:flex;gap:4px;margin-bottom:16px;background:white;padding:4px;border-radius:14px;border:1px solid var(--light);">
+    <div class="tabs-row" style="display:flex;gap:4px;margin-bottom:16px;background:white;padding:4px;border-radius:14px;border:1px solid var(--light);">
       <button class="tab-btn f-body" data-tab="actions" onclick="setTab('actions')" style="flex:1;padding:9px 4px;border-radius:11px;border:none;cursor:pointer;background:var(--navy);color:white;font-weight:800;font-size:12px;transition:all 0.15s;display:flex;align-items:center;justify-content:center;gap:6px;">Today's Actions<span class="tab-count" style="background:var(--coral);color:white;border-radius:20px;padding:1px 7px;font-size:11px;font-weight:900;">0</span></button>
       <button class="tab-btn f-body" data-tab="flagged" onclick="setTab('flagged')" style="flex:1;padding:9px 4px;border-radius:11px;border:none;cursor:pointer;background:transparent;color:var(--mid);font-weight:800;font-size:12px;transition:all 0.15s;display:flex;align-items:center;justify-content:center;gap:6px;">Orange Flags<span class="tab-count" style="background:var(--light);color:var(--mid);border-radius:20px;padding:1px 7px;font-size:11px;font-weight:900;">0</span></button>
       <button class="tab-btn f-body" data-tab="new" onclick="setTab('new')" style="flex:1;padding:9px 4px;border-radius:11px;border:none;cursor:pointer;background:transparent;color:var(--mid);font-weight:800;font-size:12px;transition:all 0.15s;display:flex;align-items:center;justify-content:center;gap:6px;">New Campaigns<span class="tab-count" style="background:var(--light);color:var(--mid);border-radius:20px;padding:1px 7px;font-size:11px;font-weight:900;">0</span></button>
@@ -871,7 +918,7 @@ function detailHTML(c) {
   const metricsH = `
     <div style="background:white;border-radius:10px;padding:14px 16px;border:1px solid #E8F0ED;">
       <div class="f-body" style="font-size:10px;font-weight:800;color:#4A5858;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:12px;">Metrics</div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+      <div class="metrics-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
         ${metrics.map(([l,v]) => `
           <div>
             <div class="f-body" style="font-size:10px;color:#4A5858;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;margin-bottom:2px;">${l}</div>
@@ -880,7 +927,7 @@ function detailHTML(c) {
       </div>
     </div>`;
 
-  return `<div style="background:#FAF8F5;padding:18px 20px;border-top:1px solid #E8F0ED;">
+  return `<div class="camp-detail-inner" style="background:#FAF8F5;padding:18px 20px;border-top:1px solid #E8F0ED;">
     ${flagH}${watchH}${roasWinsH}${metricsH}
   </div>`;
 }
@@ -896,8 +943,8 @@ function rowHTML(c) {
   const lb    = {scale_vertical:'#6BAF8A',duplicate:'#6BAF8A',orange_flag:'#F4A24A',turn_off:'#E07070',new_watch:'#889CA2',hold:'#E8F0ED'}[c.status]||'#E8F0ED';
 
   return `<div style="border-bottom:1px solid #E8F0ED;" data-cid="${c.id}">
-    <div class="row-hover" onclick="toggleExpand('${c.id}')"
-      style="display:flex;align-items:flex-start;gap:14px;padding:14px 18px;
+    <div class="row-hover camp-row-inner" onclick="toggleExpand('${c.id}')"
+      style="display:flex;align-items:flex-start;gap:12px;padding:14px 18px;
              background:${isChk?'#F6FAF7':'white'};opacity:${isChk?'0.55':'1'};
              transition:all 0.15s;border-left:3px solid ${lb};cursor:pointer;">
       ${currentTab==='actions'
@@ -908,11 +955,15 @@ function rowHTML(c) {
           ${badgeHTML(c.status)}
           <span class="f-body" style="font-size:11px;color:#4A5858;font-weight:700;">ID ${c.id} · $${c.budget}/day</span>
         </div>
-        <div class="f-body" style="font-size:13px;font-weight:700;color:#2C3535;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.name}</div>
+        <div class="camp-name f-body" style="font-size:13px;font-weight:700;color:#2C3535;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.name}</div>
         ${sa ? `<div class="f-body" style="font-size:12px;color:${isOff?'#E07070':'#6BAF8A'};font-weight:700;margin-top:3px;">${isOff?'⛔ ':''} ${sa}</div>` : ''}
         ${c.isNew ? `<div class="f-body" style="font-size:12px;color:#889CA2;font-weight:600;margin-top:3px;">Day ${c.daysWatching} · ${c.sales>0?c.sales+' sales':'No sales yet'}</div>` : ''}
+        <div class="camp-right-mobile" style="display:none;align-items:center;justify-content:space-between;margin-top:8px;">
+          ${dualRoasHTML(mR, hR, 14)}
+          <span class="chevron" id="chv-mob-${c.id}">⌄</span>
+        </div>
       </div>
-      <div style="display:flex;align-items:center;gap:12px;flex-shrink:0;">
+      <div class="camp-right" style="display:flex;align-items:center;gap:12px;flex-shrink:0;">
         ${dualRoasHTML(mR, hR, 14)}
         <span class="chevron" id="chv-${c.id}">⌄</span>
       </div>
@@ -923,10 +974,13 @@ function rowHTML(c) {
 
 /* ── UI interactions ─────────────────────────────────────── */
 function toggleExpand(id) {
-  const det=document.getElementById(`det-${id}`), chv=document.getElementById(`chv-${id}`);
+  const det=document.getElementById(`det-${id}`);
+  const chv=document.getElementById(`chv-${id}`);
+  const chvMob=document.getElementById(`chv-mob-${id}`);
   if (!det) return;
   const open=det.classList.toggle('open');
-  if (chv) chv.classList.toggle('open',open);
+  if (chv)    chv.classList.toggle('open',open);
+  if (chvMob) chvMob.classList.toggle('open',open);
 }
 function toggleCheck(id) { checked[id]=!checked[id]; renderCampaigns(); }
 
