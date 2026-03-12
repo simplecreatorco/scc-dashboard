@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>SCC Ads Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@600;700;800&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+<link href="https://fonts.cdnfonts.com/css/recoleta" rel="stylesheet" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -28,6 +29,7 @@
   }
   body { font-family:'Nunito',sans-serif; background:var(--cream); min-height:100vh; }
   .f-title { font-family:'Quicksand',Georgia,serif; }
+  .f-recoleta { font-family:'Recoleta',Georgia,serif; }
   .f-body  { font-family:'Nunito',sans-serif; }
   .range-btn:hover { background:var(--light) !important; color:var(--dark) !important; }
   .tab-btn:hover   { opacity:0.88; }
@@ -65,7 +67,7 @@
   <div style="background:var(--navy);padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:58px;">
     <div style="display:flex;align-items:center;gap:12px;">
       <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--coral),var(--sage));"></div>
-      <span class="f-title" style="color:white;font-weight:700;font-size:20px;letter-spacing:0.01em;">SCC Ads Dashboard</span>
+      <span class="f-recoleta" style="color:white;font-weight:900;font-size:21px;letter-spacing:0.01em;">SCC Ads Dashboard</span>
     </div>
     <div style="display:flex;align-items:center;gap:10px;">
       <span id="sync-status" class="f-body" style="color:var(--teal);font-size:12px;font-weight:700;">⟳ Syncing…</span>
@@ -100,7 +102,7 @@
         </div>
       </div>
       <div id="roas-legend" style="display:none;align-items:center;gap:16px;margin-bottom:10px;flex-wrap:wrap;">
-        <div style="display:flex;align-items:center;gap:6px;"><div style="width:24px;height:2.5px;background:var(--coral);border-radius:2px;"></div><span class="f-body" style="font-size:11px;font-weight:700;color:var(--mid);">Meta ROAS</span></div>
+        <div style="display:flex;align-items:center;gap:6px;"><div style="width:24px;height:2.5px;background:var(--coral);border-radius:2px;"></div><span class="f-body" style="font-size:11px;font-weight:700;color:var(--mid);">Hyros ROAS</span></div>
         <div style="display:flex;align-items:center;gap:6px;"><div style="width:24px;height:1.5px;background:#E8F0ED;border-radius:2px;border:1px dashed #C0CDD0;"></div><span class="f-body" style="font-size:11px;font-weight:700;color:var(--mid);">Break even (1.0)</span></div>
         <div style="display:flex;align-items:center;gap:6px;"><div style="width:24px;height:1.5px;background:rgba(244,162,74,0.33);border-radius:2px;border:1px dashed var(--orange);"></div><span class="f-body" style="font-size:11px;font-weight:700;color:var(--mid);">Scale threshold (1.4)</span></div>
       </div>
@@ -111,16 +113,15 @@
     <div class="grid-3" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px;">
       <div style="background:white;border-radius:14px;padding:16px 18px;border:1.5px solid var(--teal);box-shadow:0 2px 8px rgba(0,0,0,0.04);">
         <div class="f-body" style="font-size:10px;font-weight:800;color:var(--mid);letter-spacing:0.07em;text-transform:uppercase;margin-bottom:4px;">Total Spend</div>
-        <div class="f-title" id="card-spend" style="font-size:24px;font-weight:700;color:var(--dark);line-height:1.1;">—</div>
+        <div class="f-recoleta" id="card-spend" style="font-size:26px;font-weight:900;color:var(--dark);line-height:1.1;">—</div>
       </div>
       <div style="background:white;border-radius:14px;padding:16px 18px;border:1.5px solid var(--sage);box-shadow:0 2px 8px rgba(0,0,0,0.04);">
         <div class="f-body" style="font-size:10px;font-weight:800;color:var(--mid);letter-spacing:0.07em;text-transform:uppercase;margin-bottom:4px;">Hyros Revenue</div>
-        <div class="f-title" id="card-hyros-rev" style="font-size:24px;font-weight:700;color:var(--dark);line-height:1.1;">—</div>
+        <div class="f-recoleta" id="card-hyros-rev" style="font-size:26px;font-weight:900;color:var(--dark);line-height:1.1;">—</div>
       </div>
       <div id="card-roas-wrap" style="background:white;border-radius:14px;padding:16px 18px;border:1.5px solid var(--light);box-shadow:0 2px 8px rgba(0,0,0,0.04);">
         <div class="f-body" style="font-size:10px;font-weight:800;color:var(--mid);letter-spacing:0.07em;text-transform:uppercase;margin-bottom:4px;">Hyros ROAS</div>
-        <div class="f-title" id="card-roas" style="font-size:24px;font-weight:700;line-height:1.1;">—</div>
-        <div class="f-body" style="font-size:11px;color:var(--mid);margin-top:3px;">all campaigns avg</div>
+        <div class="f-recoleta" id="card-roas" style="font-size:26px;font-weight:900;line-height:1.1;">—</div>
       </div>
     </div>
 
@@ -128,15 +129,15 @@
     <div class="grid-3" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:24px;">
       <div style="background:white;border-radius:14px;padding:14px 18px;border:1.5px solid var(--light);box-shadow:0 2px 8px rgba(0,0,0,0.04);display:flex;align-items:center;gap:14px;">
         <span style="font-size:24px;">📊</span>
-        <div><div class="f-title" id="count-active" style="font-size:28px;font-weight:700;color:var(--dark);line-height:1;">—</div><div class="f-body" style="font-size:11px;font-weight:700;color:var(--mid);margin-top:2px;">Active Campaigns</div></div>
+        <div><div class="f-recoleta" id="count-active" style="font-size:30px;font-weight:900;color:var(--dark);line-height:1;">—</div><div class="f-body" style="font-size:11px;font-weight:700;color:var(--mid);margin-top:2px;">Active Campaigns</div></div>
       </div>
       <div style="background:white;border-radius:14px;padding:14px 18px;border:1.5px solid var(--green);box-shadow:0 2px 8px rgba(0,0,0,0.04);display:flex;align-items:center;gap:14px;">
         <span style="font-size:24px;">🚀</span>
-        <div><div class="f-title" id="count-scale" style="font-size:28px;font-weight:700;color:var(--green);line-height:1;">—</div><div class="f-body" style="font-size:11px;font-weight:700;color:var(--mid);margin-top:2px;">Ready to Scale</div></div>
+        <div><div class="f-recoleta" id="count-scale" style="font-size:30px;font-weight:900;color:var(--green);line-height:1;">—</div><div class="f-body" style="font-size:11px;font-weight:700;color:var(--mid);margin-top:2px;">Ready to Scale</div></div>
       </div>
       <div id="attn-card" style="background:white;border-radius:14px;padding:14px 18px;border:1.5px solid var(--orange);box-shadow:0 2px 8px rgba(0,0,0,0.04);display:flex;align-items:center;gap:14px;">
         <span style="font-size:24px;">⚠️</span>
-        <div><div class="f-title" id="count-attn" style="font-size:28px;font-weight:700;color:var(--orange);line-height:1;">—</div><div class="f-body" style="font-size:11px;font-weight:700;color:var(--mid);margin-top:2px;">Need Attention</div></div>
+        <div><div class="f-recoleta" id="count-attn" style="font-size:30px;font-weight:900;color:var(--orange);line-height:1;">—</div><div class="f-body" style="font-size:11px;font-weight:700;color:var(--mid);margin-top:2px;">Need Attention</div></div>
       </div>
     </div>
 
@@ -150,7 +151,7 @@
 
     <!-- SECTION HEADING -->
     <div style="margin-bottom:12px;">
-      <h2 id="section-heading" class="f-title" style="font-size:20px;font-weight:400;color:var(--dark);margin:0;">✅ Today's Action Items</h2>
+      <h2 id="section-heading" class="f-recoleta" style="font-size:20px;font-weight:400;color:var(--dark);margin:0;">✅ Today's Action Items</h2>
     </div>
 
     <!-- CAMPAIGN LIST -->
@@ -492,12 +493,16 @@ function transformMetaRows(rows, hyrosYP, hyros7P, hyros30P, ladderMap) {
 
   const cutoffs = { y:daysAgo(1), d3:daysAgo(3), d7:daysAgo(7), d14:daysAgo(14), d30:daysAgo(30) };
 
-  // Group all ad-level rows by campaign name
+  // Group ad-level rows by campaign name.
+  // Special rule: any campaign with "(CBO)" in the name is grouped together
+  // under the display name "MTS CBO" so they aggregate as one campaign.
+  const CBO_KEY = 'MTS CBO';
   const byName = {};
   for (const row of rows.slice(1)) {
-    const name = (row[1]||'').trim();
-    const ds   = (row[0]||'').trim();
-    if (!name || !ds) continue;
+    const rawName = (row[1]||'').trim();
+    const ds      = (row[0]||'').trim();
+    if (!rawName || !ds) continue;
+    const name = /\(CBO\)/i.test(rawName) ? CBO_KEY : rawName;
     if (!byName[name]) byName[name] = [];
     byName[name].push(row);
   }
@@ -646,9 +651,25 @@ function transformMetaRows(rows, hyrosYP, hyros7P, hyros30P, ladderMap) {
       },
       hyros,
       status, flag: null, _rawRows: cRows,
-      watchNote: isNew
-        ? `Launched ${daysWatching===0?'today':daysWatching+' day'+(daysWatching!==1?'s':'')+' ago'}. Watching for 3+ days before scaling.`
-        : null,
+      watchNote: isNew ? (() => {
+        const age    = daysWatching === 0 ? 'today' : daysWatching + ' day' + (daysWatching!==1?'s':'') + ' ago';
+        const mR7    = d7w.roas, mRY = yw.roas;
+        const hR7    = hyros.roas7, hRY = hyros.roasYest;
+        const bestR7 = hR7 ?? mR7;
+        const bestRY = hRY ?? mRY;
+        let trend = '';
+        if (bestRY != null && bestR7 != null) {
+          if (bestRY >= 1.4)       trend = ` Yesterday's ROAS is ${bestRY.toFixed(2)} — strong early signal. ✅`;
+          else if (bestRY >= 1.0)  trend = ` Yesterday's ROAS is ${bestRY.toFixed(2)} — above break-even, watching.`;
+          else                     trend = ` Yesterday's ROAS is ${bestRY.toFixed(2)} — below break-even so far. Give it a few more days.`;
+        } else if (bestRY != null) {
+          trend = ` Yesterday's ROAS: ${bestRY.toFixed(2)}.`;
+        }
+        const salesNote = d7w.purchases > 0
+          ? ` ${d7w.purchases} Meta sale${d7w.purchases!==1?'s':''} so far.`
+          : ' No sales yet — normal for day 1–2.';
+        return `Launched ${age}. Watching for 3+ days before making any decisions.${trend}${salesNote}`;
+      })() : null,
     };
 
     if (['orange_flag','turn_off'].includes(status)) {
@@ -690,11 +711,13 @@ function buildChartData() {
     const label = days === 1 ? 'Yesterday'
       : d.toLocaleString('en-US',{month:'short'}) + ' ' + d.getDate();
     const spend = Math.round(vals.spend);
-    // Distribute Hyros total proportionally by each day's spend share
+    // Distribute Hyros window revenue proportionally by each day's Meta spend share
     const hyrosRev = totalMetaSpend > 0
       ? Math.round((vals.spend / totalMetaSpend) * hyrosTotalRev)
       : 0;
-    const roas = spend > 0 ? parseFloat((hyrosRev/spend).toFixed(2)) : 0;
+    // Daily Hyros ROAS = day's estimated Hyros revenue / day's Meta spend
+    // This gives a meaningful day-by-day trend line (not a flat window average)
+    const roas = spend > 0 ? parseFloat((hyrosRev / spend).toFixed(2)) : 0;
     return { label, spend, rev: hyrosRev, roas };
   });
 }
@@ -807,31 +830,30 @@ function detailHTML(c) {
       <div class="f-body" style="font-size:11px;font-weight:800;color:#889CA2;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:4px;">
         👁 Day ${c.daysWatching}${launchStr?' · Launched '+launchStr:''}
       </div>
-      <div class="f-body" style="font-size:13px;color:#2C3535;line-height:1.6;">${c.watchNote}</div>
-      ${c.sales>0?`<div class="f-body" style="font-size:12px;color:#6BAF8A;font-weight:700;margin-top:4px;">✓ ${c.sales} Meta sales so far</div>`:''}
+      <div class="f-body" style="font-size:13px;color:#2C3535;line-height:1.7;">${c.watchNote}</div>
     </div>` : '';
 
-  // ── ROAS windows ──
+  // ── ROAS windows — Yesterday / 7-Day / 30-Day only ──
+  // Hyros values: yesterday=hyrosYP, 7-day=hyros7P, 30-day=hyros30P
+  // These are already stored on c.hyros directly from the matched Hyros entries
   const wins = [
     {label:'Yesterday', mk:'roasYest', hk:'roasYest'},
-    {label:'3-Day',     mk:'roas3',    hk:'roas3'},
     {label:'7-Day',     mk:'roas7',    hk:'roas7'},
-    {label:'14-Day',    mk:'roas14',   hk:'roas14'},
     {label:'30-Day',    mk:'roas30',   hk:'roas30'},
   ];
   const roasWinsH = `
     <div style="margin-bottom:16px;">
       <div class="f-body" style="font-size:11px;font-weight:800;color:#4A5858;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:10px;">ROAS by Window</div>
-      <div class="grid-5" style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
         ${wins.map(({label,mk,hk}) => {
           const mv=c.meta[mk], hv=c.hyros[hk];
-          return `<div style="background:white;border-radius:10px;padding:10px 8px;border:1px solid #E8F0ED;text-align:center;">
-            <div class="f-body" style="font-size:10px;color:#4A5858;font-weight:800;letter-spacing:0.05em;margin-bottom:8px;text-transform:uppercase;">${label}</div>
+          return `<div style="background:white;border-radius:10px;padding:12px 10px;border:1px solid #E8F0ED;text-align:center;">
+            <div class="f-body" style="font-size:10px;color:#4A5858;font-weight:800;letter-spacing:0.05em;margin-bottom:10px;text-transform:uppercase;">${label}</div>
             <div class="f-body" style="font-size:9px;color:#889CA2;margin-bottom:1px;font-weight:700;">Meta</div>
-            <div class="f-title" style="font-size:14px;font-weight:700;color:${roasColor(mv)};">${fmtRoas(mv)}</div>
-            <div style="height:1px;background:#E8F0ED;margin:5px 0;"></div>
+            <div class="f-recoleta" style="font-size:20px;font-weight:900;color:${roasColor(mv)};">${fmtRoas(mv)}</div>
+            <div style="height:1px;background:#E8F0ED;margin:8px 0;"></div>
             <div class="f-body" style="font-size:9px;color:#F49C8E;margin-bottom:1px;font-weight:700;">Hyros</div>
-            <div class="f-title" style="font-size:14px;font-weight:700;color:${roasColor(hv)};">${fmtRoas(hv)}</div>
+            <div class="f-recoleta" style="font-size:20px;font-weight:900;color:${roasColor(hv)};">${fmtRoas(hv)}</div>
           </div>`;
         }).join('')}
       </div>
@@ -910,10 +932,23 @@ function toggleCheck(id) { checked[id]=!checked[id]; renderCampaigns(); }
 
 /* ── Render helpers ──────────────────────────────────────── */
 function getShown() {
-  const acts = campaigns.filter(c=>['scale_vertical','duplicate','turn_off'].includes(c.status));
+  // Today's Actions: scale/D&D first, turn off last
+  const scale  = campaigns.filter(c=>['scale_vertical','duplicate'].includes(c.status));
+  const turnOff= campaigns.filter(c=>c.status==='turn_off');
+  const acts   = [...scale, ...turnOff];
+
   const flag = campaigns.filter(c=>c.status==='orange_flag');
   const nw   = campaigns.filter(c=>c.isNew);
-  return { actions:acts, flagged:flag, new:nw, all:campaigns }[currentTab] || campaigns;
+
+  // All Campaigns: hold/scale → orange → turn off → watching
+  const allSorted = [
+    ...campaigns.filter(c=>['hold','scale_vertical','duplicate'].includes(c.status)),
+    ...campaigns.filter(c=>c.status==='orange_flag'),
+    ...campaigns.filter(c=>c.status==='turn_off'),
+    ...campaigns.filter(c=>c.status==='new_watch'),
+  ];
+
+  return { actions:acts, flagged:flag, new:nw, all:allSorted }[currentTab] || allSorted;
 }
 
 function renderCampaigns() {
