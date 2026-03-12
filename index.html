@@ -1043,5 +1043,32 @@ async function loadData() {
 loadData();
 setInterval(loadData, 15 * 60 * 1000);
 </script>
+
+<script>
+// ── Auto-height broadcaster ───────────────────────────────
+// Posts the document's full height to the parent window so
+// Showit (or any iframe host) can resize the iframe to fit.
+function broadcastHeight() {
+  const h = document.documentElement.scrollHeight;
+  window.parent.postMessage({ type: 'scc-resize', height: h }, '*');
+}
+
+// Broadcast on load, after data renders, and on any resize
+window.addEventListener('load', broadcastHeight);
+window.addEventListener('resize', broadcastHeight);
+
+// Patch renderAll to also broadcast after every render
+const _origRenderAll = renderAll;
+window.renderAll = function() {
+  _origRenderAll();
+  setTimeout(broadcastHeight, 100); // slight delay so DOM has painted
+};
+// Also broadcast when campaign rows expand/collapse
+const _origToggle = toggleExpand;
+window.toggleExpand = function(id) {
+  _origToggle(id);
+  setTimeout(broadcastHeight, 250);
+};
+</script>
 </body>
 </html>
