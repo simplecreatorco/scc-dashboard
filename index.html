@@ -363,25 +363,22 @@ function matchHyros(metaName, hyrosParsed) {
   if (!hyrosParsed || !hyrosParsed.campaignMap) return null;
   const { campaignMap } = hyrosParsed;
 
-  // Special case: MTS CBO group — sum all Hyros entries containing "(CBO)"
+  // Speci// Special case: MTS CBO group — sum all Hyros entries with "(CBO)" in name
   if (metaName === 'MTS CBO') {
-    let rev=0, spend=0, sales=0, roasW=0;
+    let rev=0, spend=0, sales=0, roasNumer=0, found=0;
     for (const [key, val] of Object.entries(campaignMap)) {
       if (!key.startsWith('name:')) continue;
-      if (!/\(cbo\)/i.test(key)) continue;
-      rev   += val.rev   || 0;
-      spend += val.spend || 0;
-      sales += val.sales || 0;
-      roasW += (val.roas || 0) * (val.spend || 1);
+      const entryName = key.slice(5); // strip 'name:' prefix before regex test
+      if (!/\(cbo\)/i.test(entryName)) continue;
+      rev      += val.rev   || 0;
+      spend    += val.spend || 0;
+      sales    += val.sales || 0;
+      roasNumer+= (val.roas || 0) * (val.spend || 0);
+      found++;
     }
-    if (spend > 0) return { rev, spend, sales, roas: parseFloat((roasW/spend).toFixed(4)) };
-    // fallback: if no spend-weighted roas, try simple avg
-    const cboEntries = Object.entries(campaignMap)
-      .filter(([k]) => k.startsWith('name:') && /\(cbo\)/i.test(k))
-      .map(([,v]) => v);
-    if (cboEntries.length) {
-      const r = cboEntries.reduce((a,e)=>a+(e.roas||0),0)/cboEntries.length;
-      return { rev, spend, sales, roas: parseFloat(r.toFixed(4)) };
+    if (found > 0) {
+      const roas = spend > 0 ? parseFloat((roasNumer / spend).toFixed(4)) : null;
+      return { rev, spend, sales, roas };
     }
     return null;
   }
@@ -771,10 +768,11 @@ function buildChartData() {
   const metaByDay = {};
 
   // Aggregate Meta spend per day from ALL raw rows (includes $0-yesterday campaigns)
+  // Use normalized YYYY-MM-DD key so all date formats aggregate to the same bucket
   for (const row of allMetaRows.slice(1)) {
     const rd = parseDate(row[0]);
     if (!rd || rd < cutoff) continue;
-    const k = row[0];
+    const k = dateKey(rd);  // always 'YYYY-MM-DD' — avoids format mismatch & sort issues
     if (!metaByDay[k]) metaByDay[k] = { spend:0 };
     metaByDay[k].spend += parseFloat(row[4]) || 0;
   }
