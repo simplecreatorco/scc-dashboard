@@ -881,13 +881,17 @@ function transformMetaRows(rows, hyrosYP, hyros7P, hyros30P, ladderMap) {
     function campHyrosWindow(nDays) {
       const cutoff = daysAgo(nDays);
       const today  = new Date(); today.setHours(0,0,0,0);
+      // For CBO: meta rows are split across two campaign names in the sheet,
+      // but both are keyed as 'MTS CBO' in campDaySpend — so lookup works directly.
       const dayMap = campDaySpend[name] || {};
+      if (Object.keys(dayMap).length === 0) return { roas: null, rev: null };
       let campRev = 0, campSpend = 0;
       for (const [dk, sp] of Object.entries(dayMap)) {
         const rd = parseDate(dk);
         if (!rd || rd < cutoff || rd > today) continue;
         const totalSp     = dayTotalSpend[dk] || 0;
         const dayHyrosRev = hyrosDailyMap[dk]  ?? 0;
+        if (dayHyrosRev === 0) continue; // no Hyros data for this day — skip
         campSpend += sp;
         campRev   += totalSp > 0 ? (sp / totalSp) * dayHyrosRev : 0;
       }
@@ -1160,7 +1164,7 @@ function badgeHTML(status) {
 }
 
 /* ── Dual ROAS widget ────────────────────────────────────── */
-function dualRoasHTML(meta, hyros, size=14) {
+function dualRoasHTML(meta, hyros, size=16) {
   return `<div style="display:flex;gap:10px;align-items:center;flex-shrink:0;">
     <div style="text-align:center;">
       <div class="f-body" style="font-size:9px;color:#4A5858;font-weight:800;letter-spacing:0.07em;text-transform:uppercase;">Meta</div>
