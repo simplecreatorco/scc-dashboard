@@ -1368,8 +1368,8 @@ function renderCampaigns() {
 function renderSummary() {
   // Compute metaSpend directly from raw rows for the selected window — avoids
   // any campaign-grouping gaps (filtered rows, unmatched names, etc.)
-  const today = new Date(); today.setHours(0,0,0,0);
-  let metaFromDate, metaToDate = today;
+  const metaToday = new Date(); metaToday.setHours(0,0,0,0);
+  let metaFromDate, metaToDate = metaToday;
   if (currentRange === 'custom' && customFrom && customTo) {
     metaFromDate = customFrom; metaToDate = customTo;
   } else {
