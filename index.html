@@ -1366,8 +1366,22 @@ function renderCampaigns() {
 }
 
 function renderSummary() {
-  const sk = spendKey(currentRange);
-  const metaSpend = campaigns.reduce((a,c)=>a+(c.meta.spend?.[sk]??0), 0);
+  // Compute metaSpend directly from raw rows for the selected window — avoids
+  // any campaign-grouping gaps (filtered rows, unmatched names, etc.)
+  const today = new Date(); today.setHours(0,0,0,0);
+  let metaFromDate, metaToDate = today;
+  if (currentRange === 'custom' && customFrom && customTo) {
+    metaFromDate = customFrom; metaToDate = customTo;
+  } else {
+    const days = { y:1, d3:3, d7:7, d14:14, d30:30 }[currentRange] || 7;
+    metaFromDate = daysAgo(days);
+  }
+  let metaSpend = 0;
+  for (const row of allMetaRows) {
+    const d = parseDate((row[0]||'').trim());
+    if (!d || d < metaFromDate || d > metaToDate) continue;
+    metaSpend += parseFloat(row[4]) || 0;
+  }
 
   // Compute Hyros totals from daily sheet for all windows
   function hyrosSumRange(fromDate, toDate) {
