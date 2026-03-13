@@ -526,12 +526,6 @@ function generateFlagInsight(c) {
     return reasons.join(' ');
   }
 
-  // Yesterday recovery — kept as orange flag instead of turn-off
-  const bestY = hY ?? mY;
-  if (bestY != null && bestY >= 1.0) {
-    reasons.push(`⚡ Yesterday's ROAS ${bestY.toFixed(2)} is above break-even — keeping as orange flag instead of turning off. Watch for 1–2 more days.`);
-  }
-
   // Attribution gap
   if (h7!=null && m7!=null && (m7-h7)>0.4)
     reasons.push(`⚠ Attribution gap: Meta reports ${m7.toFixed(2)} but Hyros shows ${h7.toFixed(2)} — ${(m7-h7).toFixed(2)} difference.`);
@@ -541,8 +535,10 @@ function generateFlagInsight(c) {
   if (long!=null && mid!=null && mid < long-0.15)
     reasons.push(`Trending down: ${mid.toFixed(2)} (7-day) vs ${long.toFixed(2)} (30-day).`);
 
-  // Yesterday recovering
+  // Yesterday recovering / above break-even despite low window average
   const best7=h7??m7, bestY=hY??mY;
+  if (bestY!=null && bestY >= 1.0 && (best7==null || best7 < SCALE_THRESHOLD))
+    reasons.push(`⚡ Yesterday's ROAS ${bestY.toFixed(2)} is above break-even — keeping as orange flag instead of turning off. Watch 1–2 more days.`);
   if (bestY!=null && best7!=null && bestY>=SCALE_THRESHOLD && best7<SCALE_THRESHOLD)
     reasons.push(`Yesterday ROAS ${bestY.toFixed(2)} is strong — 7-day average pulled down by earlier days.`);
 
@@ -1163,35 +1159,33 @@ async function loadData() {
   renderAll();
 }
 
-loadData();
-setInterval(loadData, 15 * 60 * 1000);
-</script>
 
-<script>
-// ── Auto-height broadcaster ───────────────────────────────
-// Posts the document's full height to the parent window so
-// Showit (or any iframe host) can resize the iframe to fit.
+/* ── Auto-height broadcaster ─────────────────────────────── */
 function broadcastHeight() {
   const h = document.documentElement.scrollHeight;
   window.parent.postMessage({ type: 'scc-resize', height: h }, '*');
 }
-
-// Broadcast on load, after data renders, and on any resize
 window.addEventListener('load', broadcastHeight);
 window.addEventListener('resize', broadcastHeight);
 
-// Patch renderAll to also broadcast after every render
+// Wrap renderAll to broadcast after every render
 const _origRenderAll = renderAll;
-window.renderAll = function() {
+function renderAll() {
   _origRenderAll();
-  setTimeout(broadcastHeight, 100); // slight delay so DOM has painted
-};
-// Also broadcast when campaign rows expand/collapse
-const _origToggle = toggleExpand;
-window.toggleExpand = function(id) {
-  _origToggle(id);
+  setTimeout(broadcastHeight, 100);
+}
+
+// Wrap toggleExpand to broadcast after rows open/close
+const _origToggleExpand = toggleExpand;
+function toggleExpand(id) {
+  _origToggleExpand(id);
   setTimeout(broadcastHeight, 250);
-};
+}
+
+loadData();
+setInterval(loadData, 15 * 60 * 1000);
 </script>
+
+
 </body>
 </html>
