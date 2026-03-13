@@ -142,7 +142,7 @@
     <!-- TREND CHART -->
     <div style="background:white;border-radius:16px;border:1.5px solid var(--light);padding:18px 20px 14px;margin-bottom:20px;box-shadow:0 2px 10px rgba(0,0,0,0.04);">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
-        <span class="f-body" style="font-size:12px;font-weight:800;color:var(--mid);letter-spacing:0.05em;text-transform:uppercase;">Performance Trend</span>
+        <span class="f-body" style="font-size:12px;font-weight:800;color:var(--mid);letter-spacing:0.05em;text-transform:uppercase;">Performance</span>
         <div style="display:flex;gap:6px;">
           <button class="range-btn f-body" id="ct-spend" onclick="setChartTab('spend')" style="padding:5px 14px;border-radius:20px;border:1.5px solid var(--navy);background:var(--navy);color:white;font-weight:700;font-size:12px;cursor:pointer;transition:all 0.15s;">Spend & Revenue</button>
           <button class="range-btn f-body" id="ct-roas"  onclick="setChartTab('roas')"  style="padding:5px 14px;border-radius:20px;border:1.5px solid var(--light);background:white;color:var(--mid);font-weight:700;font-size:12px;cursor:pointer;transition:all 0.15s;">ROAS</button>
@@ -224,6 +224,7 @@ const META_SHEET_ID  = '1zUVhp_JUob-8PNASevaGqXyMxHl1E6zvCCNIxK_JLsM';
 const HYROS_SHEET_Y  = '1k_DQPkTVzSdAeLcoULFNk-xOaneOn-equSXl8-LAihk';
 const HYROS_SHEET_7  = '1SeOZj9T-d4EeszC3bA5yFgGPNUicIknopUM6xTG_eA8';
 const HYROS_SHEET_30 = '11uNkbn5yKLVlBJ5BH2FjDVSM_TolUJzTJNgdg8UmghY';
+const HYROS_DAILY_SHEET = '125AGooZ_Hvk9hnu1G40xTFJenUY50FdKAhREGFXue2Y'; // daily Hyros revenue
 const API_KEY        = 'AIzaSyDCo16IwVpVgHxs86yIh_njUO-KVZFdtqc';
 
 // Hyros columns (confirmed from live sheet):
@@ -235,7 +236,8 @@ const H_REV   = 5;   // "Total Revenue" column
 const H_SALES = 9;
 const H_ROAS  = 10;
 
-// Orange flag threshold (below this = flag; below 1.0 + both sources = turn off)
+// Thresholds: break-even = 1.0 ROAS. Orange flag if below SCALE but above break-even.
+// Turn off requires BOTH signals below TURN_OFF_THRESHOLD AND yesterday below break-even (1.0).
 const ORANGE_THRESHOLD = 1.25;
 const TURN_OFF_THRESHOLD = 0.75;
 const SCALE_THRESHOLD  = 1.4;
@@ -254,6 +256,7 @@ let currentChart   = 'spend';
 let checked        = {};
 let trendChartInst = null;
 let allMetaRows    = []; // all raw Meta rows for chart spend (unfiltered)
+let hyrosDailyMap  = {}; // date->rev from daily Hyros sheet: '2026-03-07' -> 1151.3
 
 /* ── Formatters ──────────────────────────────────────────── */
 const fmtCurrency = v => (v == null || v === '') ? '—' : '$' + Number(v).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0});
@@ -268,13 +271,20 @@ function roasColor(v) {
   return '#E07070';
 }
 
-function isDupDouble(name) { return /[$]50|[$]100|[$]200/.test(name); }
+// D&D eligible: name contains exactly $50 or $100 (standard D&D launch budgets)
+// If budget is non-round (e.g. $139) it means we've already D&D'd — vertical scale only
+function isDupDouble(name) { return /\$50(?!\d)|\$100(?!\d)/.test(name); }
 
 function getScaleAction(c) {
   if (c.status !== 'duplicate' && c.status !== 'scale_vertical') return '';
-  return isDupDouble(c.name)
-    ? `D&D → $${c.budget * 2}/day`
-    : `$${c.budget} → $${Math.round(c.budget * 1.09)}/day (+9%)`;
+  const newBudget = Math.round(c.budget * 1.09);
+  const budgetIsStandard = (Math.round(c.budget) === 50 || Math.round(c.budget) === 100);
+  if (isDupDouble(c.name) && budgetIsStandard) {
+    // Still at original $50 or $100 — scale 9% first, then D&D
+    return `Scale 9% → $${newBudget}/day · Then D&D`;
+  }
+  // Already D&D'd (non-standard budget) or $200+ — vertical scale only
+  return `$${c.budget} → $${newBudget}/day (+9%)`;
 }
 
 function roasKeyFor(r) {
@@ -331,6 +341,8 @@ function parseHyrosSheet(rows) {
 
   const campaignMap = {};
   let total = null;
+  // Accumulator for CBO entries — grouped exactly like Meta does
+  let cboAcc = { rev:0, spend:0, sales:0, roasNumer:0, count:0 };
 
   for (const row of rows.slice(1)) {
     const name = (row[H_NAME]||'').trim();
@@ -348,12 +360,29 @@ function parseHyrosSheet(rows) {
       continue;
     }
 
+    // Group any "(CBO)" entry under 'MTS CBO' — same rule as Meta side
+    if (/\(CBO\)/i.test(name)) {
+      cboAcc.rev      += entry.rev   || 0;
+      cboAcc.spend    += entry.spend || 0;
+      cboAcc.sales    += entry.sales || 0;
+      cboAcc.roasNumer+= (entry.roas || 0) * (entry.spend || 0);
+      cboAcc.count++;
+      continue; // don't also store under original name
+    }
+
     // Index by numeric ID (most reliable match key)
     const id = extractIdFromName(name);
     if (id) campaignMap[`id:${id}`] = entry;
 
     // Also by lowercase name
     campaignMap[`name:${name.toLowerCase()}`] = entry;
+  }
+
+  // Store the aggregated CBO entry under 'MTS CBO'
+  if (cboAcc.count > 0) {
+    const roas = cboAcc.spend > 0
+      ? parseFloat((cboAcc.roasNumer / cboAcc.spend).toFixed(4)) : null;
+    campaignMap['name:mts cbo'] = { rev: cboAcc.rev, spend: cboAcc.spend, sales: cboAcc.sales, roas };
   }
 
   return { campaignMap, total };
@@ -364,41 +393,9 @@ function matchHyros(metaName, hyrosParsed) {
   if (!hyrosParsed || !hyrosParsed.campaignMap) return null;
   const { campaignMap } = hyrosParsed;
 
-  // Speci// Special case: MTS CBO — hardcoded combination of the two known Hyros CBO entries
+  // Speci// Special case: MTS CBO — hardcoded combination of the two known // CBO is pre-grouped in parseHyrosSheet under 'name:mts cbo'
   if (metaName === 'MTS CBO') {
-    const CBO_NAMES = [
-      'broad women - advantage+ (cbo)',
-      'la 1% purchasers - advantage+ (cbo)',
-    ];
-    let rev=0, spend=0, sales=0, roasNumer=0, found=0;
-    for (const cboName of CBO_NAMES) {
-      const entry = campaignMap[`name:${cboName}`];
-      if (!entry) continue;
-      rev      += entry.rev   || 0;
-      spend    += entry.spend || 0;
-      sales    += entry.sales || 0;
-      roasNumer+= (entry.roas || 0) * (entry.spend || 0);
-      found++;
-    }
-    if (found > 0) {
-      const roas = spend > 0 ? parseFloat((roasNumer / spend).toFixed(4)) : null;
-      return { rev, spend, sales, roas };
-    }
-    // Fallback: scan for any entry containing (cbo) in case names change slightly
-    for (const [key, val] of Object.entries(campaignMap)) {
-      if (!key.startsWith('name:')) continue;
-      if (!/\(cbo\)/i.test(key.slice(5))) continue;
-      rev      += val.rev   || 0;
-      spend    += val.spend || 0;
-      sales    += val.sales || 0;
-      roasNumer+= (val.roas || 0) * (val.spend || 0);
-      found++;
-    }
-    if (found > 0) {
-      const roas = spend > 0 ? parseFloat((roasNumer / spend).toFixed(4)) : null;
-      return { rev, spend, sales, roas };
-    }
-    return null;
+    return campaignMap['name:mts cbo'] || null;
   }
 
   // 1. ID match (most reliable — IDs appear in both systems)
@@ -704,15 +701,18 @@ function transformMetaRows(rows, hyrosYP, hyros7P, hyros30P, ladderMap) {
       status = 'hold';
     } else if (primaryP >= SCALE_THRESHOLD || (recovering && primaryP >= 1.0)) {
       // Scale if 3-day ≥ 1.4, OR if yesterday ≥ 1.4 and 3-day ≥ 1.0 (recovering)
-      // D&D cap: never D&D at $200+ — always vertical scale instead
-      const canDD = isDupDouble(name) && budget < 200;
+      // D&D only if name has $50/$100 AND actual budget is still exactly $50 or $100.
+      // If actual budget has drifted (e.g. $139) = already D&D'd and vertically scaled — vertical only.
+      const budgetRounded = Math.round(budget);
+      const budgetIsStandard = (budgetRounded === 50 || budgetRounded === 100);
+      const canDD = isDupDouble(name) && budgetIsStandard;
       status = canDD ? 'duplicate' : 'scale_vertical';
     } else if (primaryP >= ORANGE_THRESHOLD) {
-      // 1.25–1.39 → orange flag
+      // 1.25–1.39 → orange flag (approaching scale threshold, worth watching)
       status = 'orange_flag';
     } else if (primaryP >= 1.0) {
-      // 1.0–1.24 → orange flag
-      status = 'orange_flag';
+      // 1.0–1.24 → Hold (profitable/break-even, stable, not yet flagged)
+      status = 'hold';
     } else {
       // Below 1.0 — check yesterday on EITHER signal before turning off
       const metaYest  = yw.roas;
@@ -779,6 +779,22 @@ function transformMetaRows(rows, hyrosYP, hyros7P, hyros30P, ladderMap) {
   return result;
 }
 
+/* ── Parse daily Hyros revenue sheet ────────────────────── */
+// Sheet cols: A=Name(label) B=IntervalStartDate C=Clicks D=AdSpend E=Revenue F=Profit G=Sales H=ROAS
+function parseHyrosDailySheet(rows) {
+  const map = {};
+  if (!rows || rows.length < 2) return map;
+  for (const row of rows.slice(1)) {
+    const dateStr = (row[1]||'').trim(); // col B: YYYY-MM-DD
+    const rev     = parseFloat(row[4]) || 0; // col E: Revenue
+    if (!dateStr || dateStr === '-') continue;
+    const d = parseDate(dateStr);
+    if (!d) continue;
+    map[dateKey(d)] = rev;
+  }
+  return map;
+}
+
 /* ── Chart ───────────────────────────────────────────────── */
 function buildChartData() {
   const days   = { y:1, d3:3, d7:7, d14:14, d30:30, custom:14 }[currentRange] || 7;
@@ -795,25 +811,13 @@ function buildChartData() {
     metaByDay[k].spend += parseFloat(row[4]) || 0;
   }
 
-  // Get total Meta spend in window to compute Hyros daily distribution
-  const totalMetaSpend = Object.values(metaByDay).reduce((a,b)=>a+b.spend, 0);
-
-  // Hyros total revenue for this window
-  const hyrosWindow = { y:'y', d3:'y', d7:'d7', d14:'d7', d30:'d30', custom:'d7' }[currentRange] || 'd7';
-  const ht = hyrosTotals[hyrosWindow];
-  const hyrosTotalRev = ht?.rev ?? 0;
-
   return Object.entries(metaByDay).sort((a,b)=>a[0].localeCompare(b[0])).map(([ds, vals]) => {
     const d = parseDate(ds);
     const label = days === 1 ? 'Yesterday'
       : d.toLocaleString('en-US',{month:'short'}) + ' ' + d.getDate();
-    const spend = Math.round(vals.spend);
-    // Distribute Hyros window revenue proportionally by each day's Meta spend share
-    const hyrosRev = totalMetaSpend > 0
-      ? Math.round((vals.spend / totalMetaSpend) * hyrosTotalRev)
-      : 0;
-    // Daily Hyros ROAS = day's estimated Hyros revenue / day's Meta spend
-    // This gives a meaningful day-by-day trend line (not a flat window average)
+    const spend  = Math.round(vals.spend);
+    // Use real daily Hyros revenue from the dedicated daily sheet
+    const hyrosRev = Math.round(hyrosDailyMap[ds] ?? 0);
     const roas = spend > 0 ? parseFloat((hyrosRev / spend).toFixed(2)) : 0;
     return { label, spend, rev: hyrosRev, roas };
   });
@@ -848,12 +852,18 @@ function renderChart() {
   const yScale = { grid:{color:'#E8F0ED'}, border:{display:false},
     ticks:{font:{family:'Nunito',size:11},color:'#4A5858', callback: v => isRoas ? v.toFixed(1) : `$${(v/1000).toFixed(0)}k`} };
 
+  // For spend/rev chart: ensure revenue line always plots above spend
+  // by giving revenue its own hidden y-axis with a compressed range
+  const spendVals = data.map(d=>d.spend);
+  const revVals   = data.map(d=>d.rev);
+  const maxSpend  = Math.max(...spendVals, 1);
+  const maxRev    = Math.max(...revVals, 1);
+
   let datasets;
   if (!isRoas) {
-    // Use separate y-axes so revenue line is always visually on top regardless of values
     datasets = [
-      {label:'Ad Spend',     data:data.map(d=>d.spend), borderColor:'#889CA2', borderWidth:2.5, pointRadius:3, pointBackgroundColor:'#889CA2', tension:0.3, fill:false, yAxisID:'y', order:2},
-      {label:'Hyros Revenue',data:data.map(d=>d.rev),   borderColor:'#6BAF8A', borderWidth:2.5, pointRadius:3, pointBackgroundColor:'#6BAF8A', tension:0.3, fill:false, yAxisID:'y', order:1},
+      {label:'Hyros Revenue',data:revVals,   borderColor:'#6BAF8A', borderWidth:2.5, pointRadius:3, pointBackgroundColor:'#6BAF8A', tension:0.3, fill:false, yAxisID:'yRev',   order:1},
+      {label:'Ad Spend',     data:spendVals, borderColor:'#889CA2', borderWidth:2.5, pointRadius:3, pointBackgroundColor:'#889CA2', tension:0.3, fill:false, yAxisID:'ySpend', order:2},
     ];
   } else {
     datasets = [
@@ -867,7 +877,17 @@ function renderChart() {
     type:'line', data:{labels, datasets},
     options:{ responsive:true, maintainAspectRatio:false,
       plugins:{legend:{display:false}, tooltip:tooltipCfg},
-      scales: isRoas ? {x:xScale, y:{...yScale,min:0}} : {x:xScale, y:yScale} }
+      scales: isRoas
+        ? {x:xScale, y:{...yScale,min:0}}
+        : {
+            x: xScale,
+            // Revenue axis: range starts at 0, top is maxRev — revenue plots in full range
+            yRev: {...yScale, min:0, suggestedMax: maxRev * 1.15,
+              ticks:{...yScale.ticks, callback: v => `$${(v/1000).toFixed(0)}k`}},
+            // Spend axis: range starts at 0 but max is capped at maxSpend — spend plots lower
+            ySpend: {...yScale, min:0, suggestedMax: maxRev * 1.15, display:false},
+          }
+      }
   });
 }
 
@@ -932,17 +952,17 @@ function detailHTML(c) {
     </div>` : '';
 
   // ── ROAS windows — Yesterday / 7-Day / 30-Day only ──
-  // Hyros values: yesterday=hyrosYP, 7-day=hyros7P, 30-day=hyros30P
-  // These are already stored on c.hyros directly from the matched Hyros entries
   const wins = [
     {label:'Yesterday', mk:'roasYest', hk:'roasYest'},
+    {label:'3-Day',     mk:'roas3',    hk:'roas3'},
     {label:'7-Day',     mk:'roas7',    hk:'roas7'},
+    {label:'14-Day',    mk:'roas14',   hk:'roas14'},
     {label:'30-Day',    mk:'roas30',   hk:'roas30'},
   ];
   const roasWinsH = `
     <div style="margin-bottom:16px;">
       <div class="f-body" style="font-size:11px;font-weight:800;color:#4A5858;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:10px;">ROAS by Window</div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;">
         ${wins.map(({label,mk,hk}) => {
           const mv=c.meta[mk], hv=c.hyros[hk];
           return `<div style="background:white;border-radius:10px;padding:12px 10px;border:1px solid #E8F0ED;text-align:center;">
@@ -1147,12 +1167,13 @@ async function loadData() {
 
   try {
     // Hyros sheets: fetch without a tab prefix so it targets the first (only) tab
-    const [metaRows, hyrosYRows, hyros7Rows, hyros30Rows, ladderRows] = await Promise.all([
-      fetchSheet(META_SHEET_ID,  'Meta Ads Data!A:N'),
-      fetchSheet(HYROS_SHEET_Y,  'A:K').catch(()=>[]),
-      fetchSheet(HYROS_SHEET_7,  'A:K').catch(()=>[]),
-      fetchSheet(HYROS_SHEET_30, 'A:K').catch(()=>[]),
-      fetchSheet(META_SHEET_ID,  'Creative Ladders!A:Z').catch(()=>[]),
+    const [metaRows, hyrosYRows, hyros7Rows, hyros30Rows, ladderRows, hyrosDailyRows] = await Promise.all([
+      fetchSheet(META_SHEET_ID,    'Meta Ads Data!A:N'),
+      fetchSheet(HYROS_SHEET_Y,    'A:K').catch(()=>[]),
+      fetchSheet(HYROS_SHEET_7,    'A:K').catch(()=>[]),
+      fetchSheet(HYROS_SHEET_30,   'A:K').catch(()=>[]),
+      fetchSheet(META_SHEET_ID,    'Creative Ladders!A:Z').catch(()=>[]),
+      fetchSheet(HYROS_DAILY_SHEET,'A:H').catch(()=>[]),
     ]);
 
     const hyrosYP  = parseHyrosSheet(hyrosYRows);
@@ -1168,6 +1189,7 @@ async function loadData() {
     };
 
     allMetaRows = metaRows; // save for chart
+    hyrosDailyMap = parseHyrosDailySheet(hyrosDailyRows);
     const live = transformMetaRows(metaRows, hyrosYP, hyros7P, hyros30P, ladderMap);
     if (live.length > 0) campaigns = live;
 
