@@ -900,19 +900,25 @@ function transformMetaRows(rows, hyrosYP, hyros7P, hyros30P, ladderMap) {
     }
     const hw3  = campHyrosWindow(3);
     const hw14 = campHyrosWindow(14);
+    // For CBO: matchHyros uses sheet-level aggregates which may be missing for some windows.
+    // Use campHyrosWindow for all windows on CBO to ensure consistent coverage.
+    const isCBO = (name === 'MTS CBO');
+    const hw1  = isCBO ? campHyrosWindow(1)  : null;
+    const hw7  = isCBO ? campHyrosWindow(7)  : null;
+    const hw30 = isCBO ? campHyrosWindow(30) : null;
 
     const hyros = {
-      roasYest: hY.roas  ?? null,
+      roasYest: isCBO ? (hw1?.roas  ?? hY.roas  ?? null) : (hY.roas  ?? null),
       roas3:    hw3.roas,
-      roas7:    h7.roas  ?? null,
+      roas7:    isCBO ? (hw7?.roas  ?? h7.roas  ?? null) : (h7.roas  ?? null),
       roas14:   hw14.roas,
-      roas30:   h30.roas ?? null,
+      roas30:   isCBO ? (hw30?.roas ?? h30.roas ?? null) : (h30.roas ?? null),
       rev: {
-        y:   Math.round(hY.rev  || 0) || null,
+        y:   isCBO ? (hw1?.rev  ?? Math.round(hY.rev  || 0) || null) : (Math.round(hY.rev  || 0) || null),
         d3:  hw3.rev,
-        d7:  Math.round(h7.rev  || 0) || null,
+        d7:  isCBO ? (hw7?.rev  ?? Math.round(h7.rev  || 0) || null) : (Math.round(h7.rev  || 0) || null),
         d14: hw14.rev,
-        d30: Math.round(h30.rev || 0) || null,
+        d30: isCBO ? (hw30?.rev ?? Math.round(h30.rev || 0) || null) : (Math.round(h30.rev || 0) || null),
       },
       sales: {
         y:   hY.sales  ?? null,
@@ -1295,12 +1301,12 @@ function rowHTML(c) {
         ${sa ? `<div class="f-body" style="font-size:12px;color:${isOff?'#E07070':'#6BAF8A'};font-weight:700;margin-top:3px;">${isOff?'⛔ ':''} ${sa}</div>` : ''}
         ${c.isNew ? `<div class="f-body" style="font-size:12px;color:#889CA2;font-weight:600;margin-top:3px;">Day ${c.daysWatching} · ${c.sales>0?c.sales+' sales':'No sales yet'}</div>` : ''}
         <div class="camp-right-mobile" style="display:none;align-items:center;justify-content:space-between;margin-top:8px;">
-          ${dualRoasHTML(mR, hR, c.isNew ? 3 : 14)}
+          ${dualRoasHTML(mR, hR, 16)}
           <span class="chevron" id="chv-mob-${c.id}">⌄</span>
         </div>
       </div>
       <div class="camp-right" style="display:flex;align-items:center;gap:12px;flex-shrink:0;">
-        ${dualRoasHTML(mR, hR, c.isNew ? 3 : 14)}
+        ${dualRoasHTML(mR, hR, 16)}
         <span class="chevron" id="chv-${c.id}">⌄</span>
       </div>
     </div>
