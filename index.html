@@ -364,13 +364,30 @@ function matchHyros(metaName, hyrosParsed) {
   if (!hyrosParsed || !hyrosParsed.campaignMap) return null;
   const { campaignMap } = hyrosParsed;
 
-  // Speci// Special case: MTS CBO group — sum all Hyros entries with "(CBO)" in name
+  // Speci// Special case: MTS CBO — hardcoded combination of the two known Hyros CBO entries
   if (metaName === 'MTS CBO') {
+    const CBO_NAMES = [
+      'broad women - advantage+ (cbo)',
+      'la 1% purchasers - advantage+ (cbo)',
+    ];
     let rev=0, spend=0, sales=0, roasNumer=0, found=0;
+    for (const cboName of CBO_NAMES) {
+      const entry = campaignMap[`name:${cboName}`];
+      if (!entry) continue;
+      rev      += entry.rev   || 0;
+      spend    += entry.spend || 0;
+      sales    += entry.sales || 0;
+      roasNumer+= (entry.roas || 0) * (entry.spend || 0);
+      found++;
+    }
+    if (found > 0) {
+      const roas = spend > 0 ? parseFloat((roasNumer / spend).toFixed(4)) : null;
+      return { rev, spend, sales, roas };
+    }
+    // Fallback: scan for any entry containing (cbo) in case names change slightly
     for (const [key, val] of Object.entries(campaignMap)) {
       if (!key.startsWith('name:')) continue;
-      const entryName = key.slice(5); // strip 'name:' prefix before regex test
-      if (!/\(cbo\)/i.test(entryName)) continue;
+      if (!/\(cbo\)/i.test(key.slice(5))) continue;
       rev      += val.rev   || 0;
       spend    += val.spend || 0;
       sales    += val.sales || 0;
@@ -697,9 +714,13 @@ function transformMetaRows(rows, hyrosYP, hyros7P, hyros30P, ladderMap) {
       // 1.0–1.24 → orange flag
       status = 'orange_flag';
     } else {
-      // Below 1.0 — but if yesterday is above break-even, keep as orange flag
-      if (primaryY != null && primaryY >= 1.0) {
-        // Yesterday recovering — don't turn off, flag instead
+      // Below 1.0 — check yesterday on EITHER signal before turning off
+      const metaYest  = yw.roas;
+      const hyrosYest = hyros.roasYest;
+      const yesterdayOK = (metaYest  != null && metaYest  >= 1.0)
+                       || (hyrosYest != null && hyrosYest >= 1.0);
+      if (yesterdayOK) {
+        // Either Meta or Hyros yesterday is above break-even — don't turn off
         status = 'orange_flag';
       } else {
         // Turn off only if BOTH Meta AND Hyros confirm below 0.75
@@ -829,9 +850,10 @@ function renderChart() {
 
   let datasets;
   if (!isRoas) {
+    // Use separate y-axes so revenue line is always visually on top regardless of values
     datasets = [
-      {label:'Ad Spend',     data:data.map(d=>d.spend), borderColor:'#889CA2', borderWidth:2.5, pointRadius:3, pointBackgroundColor:'#889CA2', tension:0.3, fill:false},
-      {label:'Hyros Revenue',data:data.map(d=>d.rev),   borderColor:'#6BAF8A', borderWidth:2.5, pointRadius:3, pointBackgroundColor:'#6BAF8A', tension:0.3, fill:false},
+      {label:'Ad Spend',     data:data.map(d=>d.spend), borderColor:'#889CA2', borderWidth:2.5, pointRadius:3, pointBackgroundColor:'#889CA2', tension:0.3, fill:false, yAxisID:'y', order:2},
+      {label:'Hyros Revenue',data:data.map(d=>d.rev),   borderColor:'#6BAF8A', borderWidth:2.5, pointRadius:3, pointBackgroundColor:'#6BAF8A', tension:0.3, fill:false, yAxisID:'y', order:1},
     ];
   } else {
     datasets = [
