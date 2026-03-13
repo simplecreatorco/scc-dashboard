@@ -6,7 +6,103 @@
 <title>SCC Ads Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@600;700;800&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
 <link href="https://fonts.cdnfonts.com/css/recoleta" rel="stylesheet" />
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js">
+/* ── Custom Calendar Picker ─────────────────────────────── */
+function toggleCal() {
+  const pop = document.getElementById('cal-popup');
+  if (pop.style.display === 'none') {
+    const now = new Date();
+    calViewYear  = now.getFullYear();
+    calViewMonth = now.getMonth();
+    calPickStep  = 0;
+    customFrom   = null; customTo = null;
+    document.getElementById('cal-range-display').textContent = 'Click a start date';
+    document.getElementById('cal-apply').style.display = 'none';
+    renderCalGrid();
+    pop.style.display = 'block';
+    // Close on outside click
+    setTimeout(() => document.addEventListener('click', calOutsideClick, {once:true}), 10);
+  } else {
+    pop.style.display = 'none';
+  }
+}
+function calOutsideClick(e) {
+  const pop = document.getElementById('cal-popup');
+  const btn = document.getElementById('cal-trigger');
+  if (!pop.contains(e.target) && e.target !== btn) {
+    pop.style.display = 'none';
+  } else {
+    setTimeout(() => document.addEventListener('click', calOutsideClick, {once:true}), 10);
+  }
+}
+function calNav(dir) {
+  calViewMonth += dir;
+  if (calViewMonth < 0)  { calViewMonth = 11; calViewYear--; }
+  if (calViewMonth > 11) { calViewMonth = 0;  calViewYear++; }
+  renderCalGrid();
+}
+function renderCalGrid() {
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('cal-month-label').textContent = months[calViewMonth] + ' ' + calViewYear;
+  const grid = document.getElementById('cal-grid');
+  const days = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+  const today = new Date(); today.setHours(0,0,0,0);
+  // First day of month, pad to Sunday
+  const first = new Date(calViewYear, calViewMonth, 1);
+  const startPad = first.getDay();
+  const daysInMonth = new Date(calViewYear, calViewMonth+1, 0).getDate();
+  let html = days.map(d => `<div class="cal-day-label">${d}</div>`).join('');
+  // Empty pads
+  for (let i = 0; i < startPad; i++) html += `<div class="cal-day cal-other"></div>`;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dt = new Date(calViewYear, calViewMonth, d);
+    let cls = 'cal-day';
+    if (dt.getTime() === today.getTime()) cls += ' cal-today';
+    if (customFrom && dt.getTime() === customFrom.getTime()) cls += ' cal-start';
+    if (customTo   && dt.getTime() === customTo.getTime())   cls += ' cal-end';
+    if (customFrom && customTo && dt > customFrom && dt < customTo) cls += ' cal-in-range';
+    const dk = dateKey(dt);
+    html += `<div class="${cls}" onclick="calPickDay('${dk}')">${d}</div>`;
+  }
+  grid.innerHTML = html;
+}
+function calPickDay(dk) {
+  const d = parseDate(dk);
+  if (!d) return;
+  if (calPickStep === 0) {
+    customFrom = d; customTo = null;
+    calPickStep = 1;
+    document.getElementById('cal-range-display').textContent = 'Now click an end date';
+    document.getElementById('cal-apply').style.display = 'none';
+  } else {
+    if (d < customFrom) { customTo = customFrom; customFrom = d; }
+    else customTo = d;
+    calPickStep = 0;
+    const fmt = dt => dt.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    document.getElementById('cal-range-display').textContent = fmt(customFrom) + ' – ' + fmt(customTo);
+    document.getElementById('cal-apply').style.display = 'block';
+  }
+  renderCalGrid();
+}
+function applyCalRange() {
+  if (!customFrom || !customTo) return;
+  document.getElementById('cal-popup').style.display = 'none';
+  // Update trigger button label
+  const fmt = dt => dt.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  document.getElementById('cal-trigger').textContent = fmt(customFrom) + ' – ' + fmt(customTo);
+  currentRange = 'custom';
+  // Highlight the Custom range button
+  document.querySelectorAll('.range-btn').forEach(b => {
+    const active = b.dataset.range === 'custom';
+    b.style.background    = active ? 'var(--navy)' : 'white';
+    b.style.color         = active ? 'white' : 'var(--mid)';
+    b.style.borderColor   = active ? 'var(--navy)' : 'var(--light)';
+  });
+  document.getElementById('custom-dates').style.display = 'flex';
+  renderAll();
+}
+
+</script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -48,6 +144,37 @@
     padding:6px 10px; color:var(--dark); background:white; outline:none;
   }
   input[type="date"]:focus { border-color:var(--teal); }
+  /* ── Custom calendar picker ─────────────────────────────── */
+  #cal-popup {
+    position:absolute; z-index:999; background:white; border:1.5px solid var(--light);
+    border-radius:14px; padding:14px; box-shadow:0 8px 32px rgba(0,0,0,0.10);
+    min-width:280px; user-select:none;
+  }
+  .cal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+  .cal-nav { background:none; border:none; cursor:pointer; font-size:18px; color:var(--mid); padding:2px 6px; border-radius:6px; }
+  .cal-nav:hover { background:var(--light); }
+  .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; }
+  .cal-day-label { text-align:center; font-size:10px; font-weight:800; color:var(--mid); letter-spacing:0.05em; padding:4px 0; text-transform:uppercase; }
+  .cal-day {
+    text-align:center; font-size:12px; font-weight:700; color:var(--dark);
+    padding:5px 2px; border-radius:6px; cursor:pointer; transition:all 0.1s;
+  }
+  .cal-day:hover:not(.cal-other) { background:var(--light); }
+  .cal-day.cal-other { color:#C8D5D5; cursor:default; }
+  .cal-day.cal-start, .cal-day.cal-end { background:var(--navy); color:white !important; border-radius:6px; }
+  .cal-day.cal-in-range { background:var(--sage); border-radius:0; }
+  .cal-day.cal-start { border-radius:6px 0 0 6px; }
+  .cal-day.cal-end   { border-radius:0 6px 6px 0; }
+  .cal-day.cal-start.cal-end { border-radius:6px; }
+  .cal-day.cal-today { outline:1.5px solid var(--teal); }
+  .cal-apply {
+    margin-top:10px; width:100%; padding:8px; border:none; border-radius:8px;
+    background:var(--navy); color:white; font-family:'Nunito',sans-serif;
+    font-size:13px; font-weight:800; cursor:pointer; letter-spacing:0.03em;
+  }
+  .cal-apply:hover { opacity:0.88; }
+  .cal-range-display { font-size:11px; color:var(--mid); text-align:center; margin-bottom:8px; font-weight:700; min-height:16px; }
+
   .chevron { display:inline-block; transition:transform 0.2s; font-size:18px; color:var(--navy); font-weight:300; user-select:none; }
   .chevron.open { transform:rotate(180deg); }
   .campaign-detail { display:none; }
@@ -134,8 +261,18 @@
       <button class="range-btn f-body" data-range="d14"    onclick="setRange('d14')"    style="padding:6px 14px;border-radius:20px;border:1.5px solid var(--light);background:white;color:var(--mid);font-weight:700;font-size:12px;cursor:pointer;transition:all 0.15s;">14-Day</button>
       <button class="range-btn f-body" data-range="d30"    onclick="setRange('d30')"    style="padding:6px 14px;border-radius:20px;border:1.5px solid var(--light);background:white;color:var(--mid);font-weight:700;font-size:12px;cursor:pointer;transition:all 0.15s;">30-Day</button>
       <button class="range-btn f-body" data-range="custom" onclick="setRange('custom')" style="padding:6px 14px;border-radius:20px;border:1.5px solid var(--light);background:white;color:var(--mid);font-weight:700;font-size:12px;cursor:pointer;transition:all 0.15s;">Custom</button>
-      <div id="custom-dates" style="display:none;align-items:center;gap:8px;margin-left:4px;">
-        <input type="date" id="date-from" /><span class="f-body" style="font-size:12px;color:var(--mid);">to</span><input type="date" id="date-to" />
+      <div id="custom-dates" style="display:none;align-items:center;gap:8px;margin-left:4px;position:relative;">
+        <button id="cal-trigger" onclick="toggleCal()" class="f-body" style="padding:5px 12px;border:1.5px solid var(--light);border-radius:8px;background:white;color:var(--dark);font-size:12px;font-weight:700;cursor:pointer;">Select dates</button>
+        <div id="cal-popup" style="display:none;top:38px;left:0;">
+          <div class="cal-header">
+            <button class="cal-nav" onclick="calNav(-1)">&#8249;</button>
+            <span id="cal-month-label" class="f-body" style="font-size:13px;font-weight:800;color:var(--dark);"></span>
+            <button class="cal-nav" onclick="calNav(1)">&#8250;</button>
+          </div>
+          <div class="cal-range-display" id="cal-range-display">Click a start date</div>
+          <div class="cal-grid" id="cal-grid"></div>
+          <button class="cal-apply" id="cal-apply" onclick="applyCalRange()" style="display:none;">Apply Range</button>
+        </div>
       </div>
     </div>
 
@@ -251,6 +388,11 @@ let hyrosTotals    = { y: null, d7: null, d30: null };
 let hyrosDailyRev  = {};
 
 let currentRange   = 'd7';
+let customFrom     = null; // Date objects for custom range
+let customTo       = null;
+let calViewYear    = null; // calendar display state
+let calViewMonth   = null;
+let calPickStep    = 0;    // 0=pick start, 1=pick end
 let currentTab     = 'actions';
 let currentChart   = 'spend';
 let checked        = {};
@@ -290,7 +432,7 @@ function getScaleAction(c) {
 function roasKeyFor(r) {
   return { y:'roasYest', d3:'roas3', d7:'roas7', d14:'roas14', d30:'roas30', custom:'roas14' }[r] || 'roas7';
 }
-function spendKey(r) { return r === 'custom' ? 'd14' : r; }
+function spendKey(r) { return r === 'custom' ? 'd30' : r; } // custom falls back to 30-day spend
 
 /* ── Date helpers ────────────────────────────────────────── */
 function parseDate(s) {
@@ -556,10 +698,32 @@ function generateFlagInsight(c) {
   if (bestY!=null && best7!=null && bestY>=SCALE_THRESHOLD && best7<SCALE_THRESHOLD)
     reasons.push(`Yesterday ROAS ${bestY.toFixed(2)} is strong — 7-day average pulled down by earlier days.`);
 
-  // Borderline
+  // Borderline / catch-all — describe exactly where ROAS sits
   if (!reasons.length) {
-    const r=h7??m7;
-    if (r!=null) reasons.push(`7-day ROAS ${r.toFixed(2)} — above break-even but below ${SCALE_THRESHOLD} scale threshold. Monitor 1–2 more days.`);
+    const r = h7 ?? m7;
+    if (r != null) {
+      if (r >= ORANGE_THRESHOLD) {
+        // 1.25–1.39: above break-even, approaching scale threshold
+        reasons.push(`7-day ROAS ${r.toFixed(2)} — profitable and approaching scale threshold. Monitor 1–2 more days.`);
+      } else if (r >= 1.0) {
+        // 1.0–1.24: flagged because 7-day is trending lower than 14-day
+        const r14 = c.hyros.roas14 ?? c.meta.roas14;
+        const trendNote = (r14 != null && r < r14)
+          ? ` Trending down from ${r14.toFixed(2)} (14-day) — flagged due to declining trend.`
+          : ' Monitor for further changes.';
+        reasons.push(`7-day ROAS ${r.toFixed(2)} — above break-even but declining.${trendNote}`);
+      } else if (r >= TURN_OFF_THRESHOLD) {
+        // 0.75–0.99: below break-even but above turn-off threshold
+        const r14 = c.hyros.roas14 ?? c.meta.roas14;
+        const trendNote = (r14 != null)
+          ? (r >= r14 ? ' Trending higher vs 14-day — watch for recovery.' : ' Trending lower vs 14-day — consider pausing.')
+          : '';
+        reasons.push(`7-day ROAS ${r.toFixed(2)} — below break-even (1.0) but above turn-off threshold (${TURN_OFF_THRESHOLD}). Losing money.${trendNote}`);
+      } else {
+        // Below 0.75 but kept as orange due to yesterday signal
+        reasons.push(`7-day ROAS ${r.toFixed(2)} — below turn-off threshold, but yesterday showed recovery. Watch carefully before turning off.`);
+      }
+    }
   }
 
   if (c.meta.cpm!=null && c.meta.cpm>30)
@@ -708,11 +872,20 @@ function transformMetaRows(rows, hyrosYP, hyros7P, hyros30P, ladderMap) {
       const canDD = isDupDouble(name) && budgetIsStandard;
       status = canDD ? 'duplicate' : 'scale_vertical';
     } else if (primaryP >= ORANGE_THRESHOLD) {
-      // 1.25–1.39 → orange flag (approaching scale threshold, worth watching)
-      status = 'orange_flag';
-    } else if (primaryP >= 1.0) {
-      // 1.0–1.24 → Hold (profitable/break-even, stable, not yet flagged)
+      // 1.25–1.39: above orange flag range — hold, not flagged
       status = 'hold';
+    } else if (primaryP >= 1.0) {
+      // 1.0–1.24: check 14-day vs 7-day trend to determine hold vs orange flag
+      // Use Hyros preferred, fall back to Meta
+      const roas14 = hyros.roas14 ?? d14w.roas;
+      const roas7  = hyros.roas7  ?? d7w.roas;
+      if (roas14 != null && roas7 != null) {
+        // Trending higher (7-day ≥ 14-day) → hold; trending lower → orange flag
+        status = roas7 >= roas14 ? 'hold' : 'orange_flag';
+      } else {
+        // Not enough window data to compare — default to hold
+        status = 'hold';
+      }
     } else {
       // Below 1.0 — check yesterday on EITHER signal before turning off
       const metaYest  = yw.roas;
@@ -797,8 +970,13 @@ function parseHyrosDailySheet(rows) {
 
 /* ── Chart ───────────────────────────────────────────────── */
 function buildChartData() {
-  const days   = { y:1, d3:3, d7:7, d14:14, d30:30, custom:14 }[currentRange] || 7;
-  const cutoff = daysAgo(days);
+  let cutoff;
+  if (currentRange === 'custom' && customFrom && customTo) {
+    cutoff = customFrom;
+  } else {
+    const days = { y:1, d3:3, d7:7, d14:14, d30:30 }[currentRange] || 7;
+    cutoff = daysAgo(days);
+  }
   const metaByDay = {};
 
   // Aggregate Meta spend per day from ALL raw rows (includes $0-yesterday campaigns)
@@ -813,7 +991,7 @@ function buildChartData() {
 
   return Object.entries(metaByDay).sort((a,b)=>a[0].localeCompare(b[0])).map(([ds, vals]) => {
     const d = parseDate(ds);
-    const label = days === 1 ? 'Yesterday'
+    const label = (currentRange === 'y') ? 'Yesterday'
       : d.toLocaleString('en-US',{month:'short'}) + ' ' + d.getDate();
     const spend  = Math.round(vals.spend);
     // Use real daily Hyros revenue from the dedicated daily sheet
@@ -1088,11 +1266,27 @@ function renderSummary() {
   const sk = spendKey(currentRange);
   const metaSpend = campaigns.reduce((a,c)=>a+(c.meta.spend?.[sk]??0), 0);
 
-  // Hyros totals from Total row — pick closest window
-  const hw = { y:'y', d3:'y', d7:'d7', d14:'d7', d30:'d30', custom:'d7' }[currentRange] || 'd7';
-  const ht = hyrosTotals[hw];
-  const hyrosRev  = ht?.rev  ?? null;
-  const hyrosRoas = ht?.roas ?? null;
+  // Compute Hyros totals from daily sheet for all windows
+  function hyrosSumRange(fromDate, toDate) {
+    let rev = 0, spend = 0, found = 0;
+    for (const [ds, r] of Object.entries(hyrosDailyMap)) {
+      const d = parseDate(ds);
+      if (!d || d < fromDate || d > toDate) continue;
+      rev += r; found++;
+    }
+    return found > 0 ? rev : null;
+  }
+  const today = new Date(); today.setHours(0,0,0,0);
+  let hyrosRev = null;
+  if (currentRange === 'custom' && customFrom && customTo) {
+    hyrosRev = hyrosSumRange(customFrom, customTo);
+  } else {
+    const days = { y:1, d3:3, d7:7, d14:14, d30:30 }[currentRange] || 7;
+    hyrosRev = hyrosSumRange(daysAgo(days), today);
+  }
+  // Meta spend for ROAS calc
+  const hyrosSpendForRoas = hyrosRev != null && metaSpend > 0 ? metaSpend : null;
+  const hyrosRoas = (hyrosRev != null && metaSpend > 0) ? parseFloat((hyrosRev / metaSpend).toFixed(2)) : null;
 
   const rc = roasColor(hyrosRoas);
   document.getElementById('card-spend').textContent     = fmtCurrency(metaSpend);
@@ -1216,6 +1410,102 @@ window.addEventListener('resize', broadcastHeight);
 
 loadData();
 setInterval(loadData, 15 * 60 * 1000);
+
+/* ── Custom Calendar Picker ─────────────────────────────── */
+function toggleCal() {
+  const pop = document.getElementById('cal-popup');
+  if (pop.style.display === 'none') {
+    const now = new Date();
+    calViewYear  = now.getFullYear();
+    calViewMonth = now.getMonth();
+    calPickStep  = 0;
+    customFrom   = null; customTo = null;
+    document.getElementById('cal-range-display').textContent = 'Click a start date';
+    document.getElementById('cal-apply').style.display = 'none';
+    renderCalGrid();
+    pop.style.display = 'block';
+    // Close on outside click
+    setTimeout(() => document.addEventListener('click', calOutsideClick, {once:true}), 10);
+  } else {
+    pop.style.display = 'none';
+  }
+}
+function calOutsideClick(e) {
+  const pop = document.getElementById('cal-popup');
+  const btn = document.getElementById('cal-trigger');
+  if (!pop.contains(e.target) && e.target !== btn) {
+    pop.style.display = 'none';
+  } else {
+    setTimeout(() => document.addEventListener('click', calOutsideClick, {once:true}), 10);
+  }
+}
+function calNav(dir) {
+  calViewMonth += dir;
+  if (calViewMonth < 0)  { calViewMonth = 11; calViewYear--; }
+  if (calViewMonth > 11) { calViewMonth = 0;  calViewYear++; }
+  renderCalGrid();
+}
+function renderCalGrid() {
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('cal-month-label').textContent = months[calViewMonth] + ' ' + calViewYear;
+  const grid = document.getElementById('cal-grid');
+  const days = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+  const today = new Date(); today.setHours(0,0,0,0);
+  // First day of month, pad to Sunday
+  const first = new Date(calViewYear, calViewMonth, 1);
+  const startPad = first.getDay();
+  const daysInMonth = new Date(calViewYear, calViewMonth+1, 0).getDate();
+  let html = days.map(d => `<div class="cal-day-label">${d}</div>`).join('');
+  // Empty pads
+  for (let i = 0; i < startPad; i++) html += `<div class="cal-day cal-other"></div>`;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dt = new Date(calViewYear, calViewMonth, d);
+    let cls = 'cal-day';
+    if (dt.getTime() === today.getTime()) cls += ' cal-today';
+    if (customFrom && dt.getTime() === customFrom.getTime()) cls += ' cal-start';
+    if (customTo   && dt.getTime() === customTo.getTime())   cls += ' cal-end';
+    if (customFrom && customTo && dt > customFrom && dt < customTo) cls += ' cal-in-range';
+    const dk = dateKey(dt);
+    html += `<div class="${cls}" onclick="calPickDay('${dk}')">${d}</div>`;
+  }
+  grid.innerHTML = html;
+}
+function calPickDay(dk) {
+  const d = parseDate(dk);
+  if (!d) return;
+  if (calPickStep === 0) {
+    customFrom = d; customTo = null;
+    calPickStep = 1;
+    document.getElementById('cal-range-display').textContent = 'Now click an end date';
+    document.getElementById('cal-apply').style.display = 'none';
+  } else {
+    if (d < customFrom) { customTo = customFrom; customFrom = d; }
+    else customTo = d;
+    calPickStep = 0;
+    const fmt = dt => dt.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    document.getElementById('cal-range-display').textContent = fmt(customFrom) + ' – ' + fmt(customTo);
+    document.getElementById('cal-apply').style.display = 'block';
+  }
+  renderCalGrid();
+}
+function applyCalRange() {
+  if (!customFrom || !customTo) return;
+  document.getElementById('cal-popup').style.display = 'none';
+  // Update trigger button label
+  const fmt = dt => dt.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  document.getElementById('cal-trigger').textContent = fmt(customFrom) + ' – ' + fmt(customTo);
+  currentRange = 'custom';
+  // Highlight the Custom range button
+  document.querySelectorAll('.range-btn').forEach(b => {
+    const active = b.dataset.range === 'custom';
+    b.style.background    = active ? 'var(--navy)' : 'white';
+    b.style.color         = active ? 'white' : 'var(--mid)';
+    b.style.borderColor   = active ? 'var(--navy)' : 'var(--light)';
+  });
+  document.getElementById('custom-dates').style.display = 'flex';
+  renderAll();
+}
+
 </script>
 
 
