@@ -422,10 +422,8 @@ function getScaleAction(c) {
   const newBudget = Math.round(c.budget * 1.09);
   const budgetIsStandard = (Math.round(c.budget) === 50 || Math.round(c.budget) === 100);
   if (isDupDouble(c.name) && budgetIsStandard) {
-    // Still at original $50 or $100 — scale 9% first, then D&D
     return `Scale 9% → $${newBudget}/day · Then D&D`;
   }
-  // Already D&D'd (non-standard budget) or $200+ — vertical scale only
   return `$${c.budget} → $${newBudget}/day (+9%)`;
 }
 
@@ -662,7 +660,6 @@ function parseLadderRows(rows) {
 
     if (launchDate) map[id] = launchDate;
   }
-
   return map;
 }
 
@@ -1239,15 +1236,13 @@ function detailHTML(c) {
   // ── ROAS windows — Yesterday / 7-Day / 30-Day only ──
   const wins = [
     {label:'Yesterday', mk:'roasYest', hk:'roasYest'},
-    {label:'3-Day',     mk:'roas3',    hk:'roas3'},
     {label:'7-Day',     mk:'roas7',    hk:'roas7'},
     {label:'14-Day',    mk:'roas14',   hk:'roas14'},
-    {label:'30-Day',    mk:'roas30',   hk:'roas30'},
   ];
   const roasWinsH = `
     <div style="margin-bottom:16px;">
       <div class="f-body" style="font-size:11px;font-weight:800;color:#4A5858;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:10px;">ROAS by Window</div>
-      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
         ${wins.map(({label,mk,hk}) => {
           const mv=c.meta[mk], hv=c.hyros[hk];
           return `<div style="background:white;border-radius:10px;padding:12px 10px;border:1px solid #E8F0ED;text-align:center;">
@@ -1291,8 +1286,8 @@ function detailHTML(c) {
 /* ── Campaign row ────────────────────────────────────────── */
 function rowHTML(c) {
   const rk    = roasKeyFor(currentRange);
-  const mR    = c.isNew ? c.meta.roas3  : c.meta[rk];
-  const hR    = c.isNew ? c.hyros.roas3 : c.hyros[rk];
+  const mR    = c.isNew ? c.meta.roas7  : c.meta[rk];
+  const hR    = c.isNew ? c.hyros.roas7 : c.hyros[rk];
   const isOff = c.status === 'turn_off';
   const isChk = !!checked[c.id];
   const sa    = getScaleAction(c);
@@ -1481,7 +1476,7 @@ async function loadData() {
     const hyrosYP  = parseHyrosSheet(hyrosYRows);
     const hyros7P  = parseHyrosSheet(hyros7Rows);
     const hyros30P = parseHyrosSheet(hyros30Rows);
-    const ladderMap= parseLadderRows(ladderRows);
+    const ladderMap  = parseLadderRows(ladderRows);
 
     // Cache total rows for summary cards
     hyrosTotals = {
