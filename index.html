@@ -470,7 +470,7 @@ async function fetchSheet(sheetId, range) {
   const res = await fetch(url);
   if (!res.ok) {
     const err = await res.json().catch(()=>({}));
-    throw new Error(`Sheets ${res.status}: ${err?.error?.message||''}`);
+    throw new Error(`Sheets ${res.status}: ${(err && err.error && err.error.message) || ''}`);
   }
   return (await res.json()).values || [];
 }
@@ -907,18 +907,22 @@ function transformMetaRows(rows, hyrosYP, hyros7P, hyros30P, ladderMap) {
     const hw7  = isCBO ? campHyrosWindow(7)  : null;
     const hw30 = isCBO ? campHyrosWindow(30) : null;
 
+    // Safe helpers to read from campHyrosWindow results without optional chaining
+    const cboR = (hw, fallback) => (hw && hw.roas != null) ? hw.roas : fallback;
+    const cboV = (hw, fallback) => (hw && hw.rev  != null) ? hw.rev  : fallback;
+
     const hyros = {
-      roasYest: isCBO ? (hw1?.roas  ?? hY.roas  ?? null) : (hY.roas  ?? null),
-      roas3:    hw3.roas,
-      roas7:    isCBO ? (hw7?.roas  ?? h7.roas  ?? null) : (h7.roas  ?? null),
-      roas14:   hw14.roas,
-      roas30:   isCBO ? (hw30?.roas ?? h30.roas ?? null) : (h30.roas ?? null),
+      roasYest: isCBO ? cboR(hw1,  hY.roas  ?? null) : (hY.roas  ?? null),
+      roas3:    hw3 ? hw3.roas : null,
+      roas7:    isCBO ? cboR(hw7,  h7.roas  ?? null) : (h7.roas  ?? null),
+      roas14:   hw14 ? hw14.roas : null,
+      roas30:   isCBO ? cboR(hw30, h30.roas ?? null) : (h30.roas ?? null),
       rev: {
-        y:   isCBO ? (hw1?.rev  ?? Math.round(hY.rev  || 0) || null) : (Math.round(hY.rev  || 0) || null),
-        d3:  hw3.rev,
-        d7:  isCBO ? (hw7?.rev  ?? Math.round(h7.rev  || 0) || null) : (Math.round(h7.rev  || 0) || null),
-        d14: hw14.rev,
-        d30: isCBO ? (hw30?.rev ?? Math.round(h30.rev || 0) || null) : (Math.round(h30.rev || 0) || null),
+        y:   isCBO ? cboV(hw1,  Math.round(hY.rev  || 0) || null) : (Math.round(hY.rev  || 0) || null),
+        d3:  hw3  ? hw3.rev  : null,
+        d7:  isCBO ? cboV(hw7,  Math.round(h7.rev  || 0) || null) : (Math.round(h7.rev  || 0) || null),
+        d14: hw14 ? hw14.rev : null,
+        d30: isCBO ? cboV(hw30, Math.round(h30.rev || 0) || null) : (Math.round(h30.rev || 0) || null),
       },
       sales: {
         y:   hY.sales  ?? null,
