@@ -363,6 +363,29 @@ function matchHyros(metaName, hyrosParsed) {
   if (!hyrosParsed || !hyrosParsed.campaignMap) return null;
   const { campaignMap } = hyrosParsed;
 
+  // Special case: MTS CBO group — sum all Hyros entries containing "(CBO)"
+  if (metaName === 'MTS CBO') {
+    let rev=0, spend=0, sales=0, roasW=0;
+    for (const [key, val] of Object.entries(campaignMap)) {
+      if (!key.startsWith('name:')) continue;
+      if (!/\(cbo\)/i.test(key)) continue;
+      rev   += val.rev   || 0;
+      spend += val.spend || 0;
+      sales += val.sales || 0;
+      roasW += (val.roas || 0) * (val.spend || 1);
+    }
+    if (spend > 0) return { rev, spend, sales, roas: parseFloat((roasW/spend).toFixed(4)) };
+    // fallback: if no spend-weighted roas, try simple avg
+    const cboEntries = Object.entries(campaignMap)
+      .filter(([k]) => k.startsWith('name:') && /\(cbo\)/i.test(k))
+      .map(([,v]) => v);
+    if (cboEntries.length) {
+      const r = cboEntries.reduce((a,e)=>a+(e.roas||0),0)/cboEntries.length;
+      return { rev, spend, sales, roas: parseFloat(r.toFixed(4)) };
+    }
+    return null;
+  }
+
   // 1. ID match (most reliable — IDs appear in both systems)
   const metaId = extractIdFromName(metaName);
   if (metaId && campaignMap[`id:${metaId}`]) return campaignMap[`id:${metaId}`];
@@ -505,6 +528,12 @@ function generateFlagInsight(c) {
     return reasons.join(' ');
   }
 
+  // Yesterday recovery — kept as orange flag instead of turn-off
+  const bestY = hY ?? mY;
+  if (bestY != null && bestY >= 1.0) {
+    reasons.push(`⚡ Yesterday's ROAS ${bestY.toFixed(2)} is above break-even — keeping as orange flag instead of turning off. Watch for 1–2 more days.`);
+  }
+
   // Attribution gap
   if (h7!=null && m7!=null && (m7-h7)>0.4)
     reasons.push(`⚠ Attribution gap: Meta reports ${m7.toFixed(2)} but Hyros shows ${h7.toFixed(2)} — ${(m7-h7).toFixed(2)} difference.`);
@@ -643,11 +672,14 @@ function transformMetaRows(rows, hyrosYP, hyros7P, hyros30P, ladderMap) {
     // IG Followers campaigns are traffic-only — never scale or turn off
     const isTrafficOnly = /ig followers/i.test(name);
 
-    // Primary 7-day: prefer Hyros (more accurate), fall back to Meta
-    const primary7 = hyros.roas7  ?? d7w.roas;
+    // Primary signal: use 3-day window (more responsive), prefer Hyros over Meta
+    // Fall back to 7-day if 3-day is null (e.g. campaign paused mid-week)
+    const primary3 = hyros.roas3  ?? d3w.roas;
+    const primary7 = hyros.roas7  ?? d7w.roas;  // kept for turn-off logic
+    const primaryP = primary3 ?? primary7;        // "primary" for scale decisions
     const primaryY = hyros.roasYest ?? yw.roas;
 
-    // Is yesterday strong even if 7-day average is below threshold? (recovering from dip)
+    // Is yesterday strong even if 3-day average is below threshold? (recovering from dip)
     const recovering = primaryY != null && primaryY >= SCALE_THRESHOLD;
 
     let status;
@@ -657,32 +689,36 @@ function transformMetaRows(rows, hyrosYP, hyros7P, hyros30P, ladderMap) {
     } else if (isTrafficOnly) {
       // Traffic-only campaigns: show in All Campaigns only, neutral status
       status = 'hold';
-    } else if (primary7 === null) {
+    } else if (primaryP === null) {
       status = 'hold';
-    } else if (primary7 >= SCALE_THRESHOLD || (recovering && primary7 >= 1.0)) {
-      // Scale if 7-day ≥ 1.4, OR if yesterday ≥ 1.4 and 7-day ≥ 1.0 (recovering)
-      status = isDupDouble(name) ? 'duplicate' : 'scale_vertical';
-    } else if (primary7 >= ORANGE_THRESHOLD) {
-      // 1.25–1.39 → orange flag (below scale threshold but above concern line)
+    } else if (primaryP >= SCALE_THRESHOLD || (recovering && primaryP >= 1.0)) {
+      // Scale if 3-day ≥ 1.4, OR if yesterday ≥ 1.4 and 3-day ≥ 1.0 (recovering)
+      // D&D cap: never D&D at $200+ — always vertical scale instead
+      const canDD = isDupDouble(name) && budget < 200;
+      status = canDD ? 'duplicate' : 'scale_vertical';
+    } else if (primaryP >= ORANGE_THRESHOLD) {
+      // 1.25–1.39 → orange flag
       status = 'orange_flag';
-    } else if (primary7 >= 1.0) {
-      // 1.0–1.24 → orange flag (borderline, needs monitoring)
+    } else if (primaryP >= 1.0) {
+      // 1.0–1.24 → orange flag
       status = 'orange_flag';
     } else {
-      // Below 1.0 — turn off only if BOTH Meta AND Hyros confirm below 0.75
-      // If only one signal available, use orange flag (can't confirm with both)
-      const metaR7  = d7w.roas;
-      const hyrosR7 = hyros.roas7;
-      if (metaR7 != null && hyrosR7 != null) {
-        // Both signals present: require both to be below 0.75
-        status = (metaR7 < TURN_OFF_THRESHOLD && hyrosR7 < TURN_OFF_THRESHOLD)
-          ? 'turn_off' : 'orange_flag';
-      } else if (metaR7 != null && hyrosR7 == null) {
-        // Only Meta: can't confirm — orange flag, not turn off
+      // Below 1.0 — but if yesterday is above break-even, keep as orange flag
+      if (primaryY != null && primaryY >= 1.0) {
+        // Yesterday recovering — don't turn off, flag instead
         status = 'orange_flag';
       } else {
-        // Only Hyros (unusual): orange flag unless clearly terrible
-        status = (hyrosR7 != null && hyrosR7 < TURN_OFF_THRESHOLD) ? 'turn_off' : 'orange_flag';
+        // Turn off only if BOTH Meta AND Hyros confirm below 0.75
+        const metaR7  = d7w.roas;
+        const hyrosR7 = hyros.roas7;
+        if (metaR7 != null && hyrosR7 != null) {
+          status = (metaR7 < TURN_OFF_THRESHOLD && hyrosR7 < TURN_OFF_THRESHOLD)
+            ? 'turn_off' : 'orange_flag';
+        } else if (metaR7 != null && hyrosR7 == null) {
+          status = 'orange_flag';
+        } else {
+          status = (hyrosR7 != null && hyrosR7 < TURN_OFF_THRESHOLD) ? 'turn_off' : 'orange_flag';
+        }
       }
     }
 
@@ -734,15 +770,13 @@ function buildChartData() {
   const cutoff = daysAgo(days);
   const metaByDay = {};
 
-  // Aggregate Meta spend per day
-  for (const c of campaigns) {
-    for (const row of (c._rawRows||[])) {
-      const rd = parseDate(row[0]);
-      if (!rd || rd < cutoff) continue;
-      const k = row[0];
-      if (!metaByDay[k]) metaByDay[k] = { spend:0 };
-      metaByDay[k].spend += parseFloat(row[4]) || 0;
-    }
+  // Aggregate Meta spend per day from ALL raw rows (includes $0-yesterday campaigns)
+  for (const row of allMetaRows.slice(1)) {
+    const rd = parseDate(row[0]);
+    if (!rd || rd < cutoff) continue;
+    const k = row[0];
+    if (!metaByDay[k]) metaByDay[k] = { spend:0 };
+    metaByDay[k].spend += parseFloat(row[4]) || 0;
   }
 
   // Get total Meta spend in window to compute Hyros daily distribution
@@ -1034,7 +1068,7 @@ function renderSummary() {
   const hasOff= campaigns.some(c=>c.status==='turn_off');
   const atC   = hasOff ? '#E07070' : '#F4A24A';
 
-  document.getElementById('count-active').textContent = campaigns.filter(c=>!c.isNew).length;
+  document.getElementById('count-active').textContent = campaigns.length;
   document.getElementById('count-scale').textContent  = sc;
   document.getElementById('count-attn').textContent   = at;
   document.getElementById('count-attn').style.color   = atC;
@@ -1115,6 +1149,7 @@ async function loadData() {
       d30: hyros30P.total ?? null,
     };
 
+    allMetaRows = metaRows; // save for chart
     const live = transformMetaRows(metaRows, hyrosYP, hyros7P, hyros30P, ladderMap);
     if (live.length > 0) campaigns = live;
 
