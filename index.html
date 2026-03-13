@@ -794,6 +794,22 @@ function transformMetaRows(rows, hyrosYP, hyros7P, hyros30P, ladderMap) {
     byName[name].push(row);
   }
 
+  // Pre-build daily spend maps for campHyrosWindow efficiency
+  // dayTotalSpend['YYYY-MM-DD'] = total account Meta spend that day
+  // campDaySpend['CampName']['YYYY-MM-DD'] = that campaign's spend that day
+  const dayTotalSpend = {};
+  const campDaySpend  = {};
+  for (const row of rows.slice(1)) {
+    const rd = parseDate(row[0]);
+    if (!rd) continue;
+    const dk   = dateKey(rd);
+    const cn   = /\(CBO\)/i.test((row[1]||'').trim()) ? 'MTS CBO' : (row[1]||'').trim();
+    const sp   = parseFloat(row[4]) || 0;
+    dayTotalSpend[dk] = (dayTotalSpend[dk] || 0) + sp;
+    if (!campDaySpend[cn]) campDaySpend[cn] = {};
+    campDaySpend[cn][dk] = (campDaySpend[cn][dk] || 0) + sp;
+  }
+
   const result = [];
 
   for (const [name, cRows] of Object.entries(byName)) {
@@ -865,22 +881,15 @@ function transformMetaRows(rows, hyrosYP, hyros7P, hyros30P, ladderMap) {
     function campHyrosWindow(nDays) {
       const cutoff = daysAgo(nDays);
       const today  = new Date(); today.setHours(0,0,0,0);
+      const dayMap = campDaySpend[name] || {};
       let campRev = 0, campSpend = 0;
-      for (const row of allMetaRows.slice(1)) {
-        const rd = parseDate(row[0]);
+      for (const [dk, sp] of Object.entries(dayMap)) {
+        const rd = parseDate(dk);
         if (!rd || rd < cutoff || rd > today) continue;
-        const rowCamp = /\(CBO\)/i.test((row[1]||'').trim()) ? 'MTS CBO' : (row[1]||'').trim();
-        if (rowCamp !== name) continue;
-        const dayKey   = dateKey(rd);
-        // Total account Meta spend that day (all campaigns)
-        const totalDaySpend = allMetaRows.slice(1).reduce((sum, r2) => {
-          const d2 = parseDate(r2[0]);
-          return (d2 && dateKey(d2) === dayKey) ? sum + (parseFloat(r2[4])||0) : sum;
-        }, 0);
-        const dayHyrosRev = hyrosDailyMap[dayKey] ?? 0;
-        const cSpend = parseFloat(row[4]) || 0;
-        campSpend += cSpend;
-        campRev   += totalDaySpend > 0 ? (cSpend / totalDaySpend) * dayHyrosRev : 0;
+        const totalSp     = dayTotalSpend[dk] || 0;
+        const dayHyrosRev = hyrosDailyMap[dk]  ?? 0;
+        campSpend += sp;
+        campRev   += totalSp > 0 ? (sp / totalSp) * dayHyrosRev : 0;
       }
       if (campSpend === 0) return { roas: null, rev: null };
       return { roas: parseFloat((campRev / campSpend).toFixed(4)), rev: Math.round(campRev) };
@@ -912,11 +921,11 @@ function transformMetaRows(rows, hyrosYP, hyros7P, hyros30P, ladderMap) {
     // IG Followers campaigns are traffic-only — never scale or turn off
     const isTrafficOnly = /ig followers/i.test(name);
 
-    // Primary signal: use 3-day window (more responsive), prefer Hyros over Meta
-    // Fall back to 7-day if 3-day is null (e.g. campaign paused mid-week)
-    const primary3 = hyros.roas3  ?? d3w.roas;
-    const primary7 = hyros.roas7  ?? d7w.roas;  // kept for turn-off logic
-    const primaryP = primary3 ?? primary7;        // "primary" for scale decisions
+    // Primary signal for status decisions — use REAL data sources only
+    // hyros.roas3/roas14 are proportional estimates (display only) — never use for status
+    // Real sources: Hyros yesterday sheet, Hyros 7-day sheet, Meta windows
+    const primary7 = hyros.roas7  ?? d7w.roas;  // primary scale signal
+    const primaryP = primary7;                    // status decisions based on 7-day
     const primaryY = hyros.roasYest ?? yw.roas;
 
     // Is yesterday strong even if 3-day average is below threshold? (recovering from dip)
@@ -943,10 +952,9 @@ function transformMetaRows(rows, hyrosYP, hyros7P, hyros30P, ladderMap) {
       // 1.25–1.39: above orange flag range — hold, not flagged
       status = 'hold';
     } else if (primaryP >= 1.0) {
-      // 1.0–1.24: check 14-day vs 7-day trend to determine hold vs orange flag
-      // Use Hyros preferred, fall back to Meta
-      const roas14 = hyros.roas14 ?? d14w.roas;
-      const roas7  = hyros.roas7  ?? d7w.roas;
+      // 1.0–1.24: check 14-day vs 7-day trend using Meta (real data for both windows)
+      const roas14 = d14w.roas;  // Meta 14-day (real)
+      const roas7  = d7w.roas;   // Meta 7-day (real)
       if (roas14 != null && roas7 != null) {
         // Trending higher (7-day ≥ 14-day) → hold; trending lower → orange flag
         status = roas7 >= roas14 ? 'hold' : 'orange_flag';
