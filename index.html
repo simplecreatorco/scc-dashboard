@@ -1,0 +1,1197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SCC Ads Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@600;700;800&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+<link href="https://fonts.cdnfonts.com/css/recoleta" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --navy:       #889CA2;
+    --sage:       #BFD9CC;
+    --coral:      #F49C8E;
+    --teal:       #B3DCDA;
+    --cream:      #FAF8F5;
+    --dark:       #2C3535;
+    --mid:        #4A5858;
+    --light:      #E8F0ED;
+    --white:      #FFFFFF;
+    --orange:     #F4A24A;
+    --red:        #E07070;
+    --green:      #6BAF8A;
+    --softRed:    #FCF0F0;
+    --softGreen:  #EFF7F3;
+    --softOrange: #FDF4E7;
+    --softSlate:  #F0F4F6;
+  }
+  body { font-family:'Nunito',sans-serif; background:var(--cream); min-height:100vh; }
+  .f-title { font-family:'Quicksand',Georgia,serif; }
+  .f-recoleta { font-family:'Recoleta',Georgia,serif; }
+  .f-body  { font-family:'Nunito',sans-serif; }
+  .range-btn:hover { background:var(--light) !important; color:var(--dark) !important; }
+  .tab-btn:hover   { opacity:0.88; }
+  .row-hover:hover { background:#FAF8F5 !important; }
+  .custom-cb {
+    width:20px; height:20px; border-radius:6px; flex-shrink:0;
+    border:2px solid var(--sage); background:white; margin-top:2px;
+    display:flex; align-items:center; justify-content:center;
+    transition:all 0.15s; cursor:pointer;
+  }
+  .custom-cb.on { background:var(--green); border-color:var(--green); }
+  .custom-cb.on::after { content:'✓'; color:white; font-size:13px; font-weight:900; line-height:1; }
+  input[type="date"] {
+    font-family:'Nunito',sans-serif; font-size:13px;
+    border:1.5px solid var(--light); border-radius:8px;
+    padding:6px 10px; color:var(--dark); background:white; outline:none;
+  }
+  input[type="date"]:focus { border-color:var(--teal); }
+  .chevron { display:inline-block; transition:transform 0.2s; font-size:18px; color:var(--navy); font-weight:300; user-select:none; }
+  .chevron.open { transform:rotate(180deg); }
+  .campaign-detail { display:none; }
+  .campaign-detail.open { display:block; }
+  @media (max-width:640px) {
+    .camp-right { display:none !important; }
+    .camp-right-mobile { display:flex !important; }
+
+    /* Summary grids */
+    .grid-3 { grid-template-columns:repeat(2,1fr) !important; }
+    .grid-5 { grid-template-columns:repeat(2,1fr) !important; }
+    .grid-2 { grid-template-columns:1fr !important; }
+
+    /* Tabs — scrollable row instead of squished flex */
+    .tabs-row { overflow-x:auto; -webkit-overflow-scrolling:touch; gap:4px; flex-wrap:nowrap !important; }
+    .tab-btn  { flex:0 0 auto !important; font-size:11px !important; padding:8px 10px !important; }
+
+    /* Date range pills */
+    .range-row { flex-wrap:wrap !important; gap:6px !important; }
+
+    /* Campaign row — stack badge/name block above ROAS */
+    .camp-row-inner {
+      flex-wrap:wrap !important;
+      gap:8px !important;
+      padding:12px 14px !important;
+    }
+    .camp-row-inner .camp-right {
+      width:100%;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+    }
+
+    /* Badge text smaller on mobile */
+    .badge-pill { font-size:9px !important; padding:3px 8px !important; }
+
+    /* Campaign name — allow wrap on mobile */
+    .camp-name { white-space:normal !important; font-size:12px !important; }
+
+    /* Detail panel padding */
+    .camp-detail-inner { padding:14px 14px !important; }
+
+    /* Metrics grid 2-col on mobile */
+    .metrics-grid { grid-template-columns:repeat(2,1fr) !important; }
+
+    /* Chart height smaller on mobile */
+    .chart-wrap { height:160px !important; }
+
+    /* Summary card numbers smaller */
+    .summary-num { font-size:20px !important; }
+    .summary-count { font-size:24px !important; }
+
+    /* Top bar */
+    .topbar-inner { padding:10px 14px !important; }
+    .topbar-title  { font-size:17px !important; }
+  }
+  button { font-family:'Nunito',sans-serif; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- TOP BAR -->
+  <div class="topbar-inner" style="background:var(--navy);padding:0 16px;display:flex;align-items:center;justify-content:space-between;height:58px;">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--coral),var(--sage));"></div>
+      <span class="f-recoleta topbar-title" style="color:white;font-weight:900;font-size:21px;letter-spacing:0.01em;">SCC Ads Dashboard</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span id="sync-status" class="f-body" style="color:var(--teal);font-size:12px;font-weight:700;">⟳ Syncing…</span>
+      <button onclick="loadData()" style="background:transparent;border:1px solid rgba(255,255,255,0.3);color:white;border-radius:8px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;opacity:0.85;">↺ Refresh</button>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div style="max-width:960px;margin:0 auto;padding:24px 16px;">
+
+    <!-- DATE RANGE -->
+    <div class="range-row" style="display:flex;align-items:center;gap:8px;margin-bottom:20px;flex-wrap:wrap;">
+      <span class="f-body" style="font-size:12px;font-weight:800;color:var(--mid);letter-spacing:0.05em;text-transform:uppercase;margin-right:4px;">Viewing:</span>
+      <button class="range-btn f-body" data-range="y"      onclick="setRange('y')"      style="padding:6px 14px;border-radius:20px;border:1.5px solid var(--light);background:white;color:var(--mid);font-weight:700;font-size:12px;cursor:pointer;transition:all 0.15s;">Yesterday</button>
+      <button class="range-btn f-body" data-range="d3"     onclick="setRange('d3')"     style="padding:6px 14px;border-radius:20px;border:1.5px solid var(--light);background:white;color:var(--mid);font-weight:700;font-size:12px;cursor:pointer;transition:all 0.15s;">3-Day</button>
+      <button class="range-btn f-body" data-range="d7"     onclick="setRange('d7')"     style="padding:6px 14px;border-radius:20px;border:1.5px solid var(--light);background:white;color:var(--mid);font-weight:700;font-size:12px;cursor:pointer;transition:all 0.15s;">7-Day</button>
+      <button class="range-btn f-body" data-range="d14"    onclick="setRange('d14')"    style="padding:6px 14px;border-radius:20px;border:1.5px solid var(--light);background:white;color:var(--mid);font-weight:700;font-size:12px;cursor:pointer;transition:all 0.15s;">14-Day</button>
+      <button class="range-btn f-body" data-range="d30"    onclick="setRange('d30')"    style="padding:6px 14px;border-radius:20px;border:1.5px solid var(--light);background:white;color:var(--mid);font-weight:700;font-size:12px;cursor:pointer;transition:all 0.15s;">30-Day</button>
+      <button class="range-btn f-body" data-range="custom" onclick="setRange('custom')" style="padding:6px 14px;border-radius:20px;border:1.5px solid var(--light);background:white;color:var(--mid);font-weight:700;font-size:12px;cursor:pointer;transition:all 0.15s;">Custom</button>
+      <div id="custom-dates" style="display:none;align-items:center;gap:8px;margin-left:4px;">
+        <input type="date" id="date-from" /><span class="f-body" style="font-size:12px;color:var(--mid);">to</span><input type="date" id="date-to" />
+      </div>
+    </div>
+
+    <!-- TREND CHART -->
+    <div style="background:white;border-radius:16px;border:1.5px solid var(--light);padding:18px 20px 14px;margin-bottom:20px;box-shadow:0 2px 10px rgba(0,0,0,0.04);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+        <span class="f-body" style="font-size:12px;font-weight:800;color:var(--mid);letter-spacing:0.05em;text-transform:uppercase;">Performance Trend</span>
+        <div style="display:flex;gap:6px;">
+          <button class="range-btn f-body" id="ct-spend" onclick="setChartTab('spend')" style="padding:5px 14px;border-radius:20px;border:1.5px solid var(--navy);background:var(--navy);color:white;font-weight:700;font-size:12px;cursor:pointer;transition:all 0.15s;">Spend & Revenue</button>
+          <button class="range-btn f-body" id="ct-roas"  onclick="setChartTab('roas')"  style="padding:5px 14px;border-radius:20px;border:1.5px solid var(--light);background:white;color:var(--mid);font-weight:700;font-size:12px;cursor:pointer;transition:all 0.15s;">ROAS</button>
+        </div>
+      </div>
+      <div id="roas-legend" style="display:none;align-items:center;gap:16px;margin-bottom:10px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:6px;"><div style="width:24px;height:2.5px;background:var(--coral);border-radius:2px;"></div><span class="f-body" style="font-size:11px;font-weight:700;color:var(--mid);">Hyros ROAS</span></div>
+        <div style="display:flex;align-items:center;gap:6px;"><div style="width:24px;height:1.5px;background:#E8F0ED;border-radius:2px;border:1px dashed #C0CDD0;"></div><span class="f-body" style="font-size:11px;font-weight:700;color:var(--mid);">Break even (1.0)</span></div>
+        <div style="display:flex;align-items:center;gap:6px;"><div style="width:24px;height:1.5px;background:rgba(244,162,74,0.33);border-radius:2px;border:1px dashed var(--orange);"></div><span class="f-body" style="font-size:11px;font-weight:700;color:var(--mid);">Scale threshold (1.4)</span></div>
+      </div>
+      <div class="chart-wrap" style="position:relative;height:200px;"><canvas id="trend-chart"></canvas></div>
+    </div>
+
+    <!-- SUMMARY ROW 1 -->
+    <div class="grid-3" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px;">
+      <div style="background:white;border-radius:14px;padding:16px 18px;border:1.5px solid var(--teal);box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+        <div class="f-body" style="font-size:10px;font-weight:800;color:var(--mid);letter-spacing:0.07em;text-transform:uppercase;margin-bottom:4px;">Total Spend</div>
+        <div class="f-recoleta" id="card-spend" class="summary-num" style="font-size:26px;font-weight:900;color:var(--dark);line-height:1.1;">—</div>
+      </div>
+      <div style="background:white;border-radius:14px;padding:16px 18px;border:1.5px solid var(--sage);box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+        <div class="f-body" style="font-size:10px;font-weight:800;color:var(--mid);letter-spacing:0.07em;text-transform:uppercase;margin-bottom:4px;">Hyros Revenue</div>
+        <div class="f-recoleta" id="card-hyros-rev" class="summary-num" style="font-size:26px;font-weight:900;color:var(--dark);line-height:1.1;">—</div>
+      </div>
+      <div id="card-roas-wrap" style="background:white;border-radius:14px;padding:16px 18px;border:1.5px solid var(--light);box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+        <div class="f-body" style="font-size:10px;font-weight:800;color:var(--mid);letter-spacing:0.07em;text-transform:uppercase;margin-bottom:4px;">Hyros ROAS</div>
+        <div class="f-recoleta" id="card-roas" class="summary-num" style="font-size:26px;font-weight:900;line-height:1.1;">—</div>
+      </div>
+    </div>
+
+    <!-- SUMMARY ROW 2 -->
+    <div class="grid-3" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:24px;">
+      <div style="background:white;border-radius:14px;padding:14px 18px;border:1.5px solid var(--light);box-shadow:0 2px 8px rgba(0,0,0,0.04);display:flex;align-items:center;gap:14px;">
+        <span style="font-size:24px;">📊</span>
+        <div><div class="f-recoleta" id="count-active" class="summary-count" style="font-size:30px;font-weight:900;color:var(--dark);line-height:1;">—</div><div class="f-body" style="font-size:11px;font-weight:700;color:var(--mid);margin-top:2px;">Active Campaigns</div></div>
+      </div>
+      <div style="background:white;border-radius:14px;padding:14px 18px;border:1.5px solid var(--green);box-shadow:0 2px 8px rgba(0,0,0,0.04);display:flex;align-items:center;gap:14px;">
+        <span style="font-size:24px;">🚀</span>
+        <div><div class="f-recoleta" id="count-scale" class="summary-count" style="font-size:30px;font-weight:900;color:var(--green);line-height:1;">—</div><div class="f-body" style="font-size:11px;font-weight:700;color:var(--mid);margin-top:2px;">Ready to Scale</div></div>
+      </div>
+      <div id="attn-card" style="background:white;border-radius:14px;padding:14px 18px;border:1.5px solid var(--orange);box-shadow:0 2px 8px rgba(0,0,0,0.04);display:flex;align-items:center;gap:14px;">
+        <span style="font-size:24px;">⚠️</span>
+        <div><div class="f-recoleta" id="count-attn" class="summary-count" style="font-size:30px;font-weight:900;color:var(--orange);line-height:1;">—</div><div class="f-body" style="font-size:11px;font-weight:700;color:var(--mid);margin-top:2px;">Need Attention</div></div>
+      </div>
+    </div>
+
+    <!-- TABS -->
+    <div class="tabs-row" style="display:flex;gap:4px;margin-bottom:16px;background:white;padding:4px;border-radius:14px;border:1px solid var(--light);">
+      <button class="tab-btn f-body" data-tab="actions" onclick="setTab('actions')" style="flex:1;padding:9px 4px;border-radius:11px;border:none;cursor:pointer;background:var(--navy);color:white;font-weight:800;font-size:12px;transition:all 0.15s;display:flex;align-items:center;justify-content:center;gap:6px;">Today's Actions<span class="tab-count" style="background:var(--coral);color:white;border-radius:20px;padding:1px 7px;font-size:11px;font-weight:900;">0</span></button>
+      <button class="tab-btn f-body" data-tab="flagged" onclick="setTab('flagged')" style="flex:1;padding:9px 4px;border-radius:11px;border:none;cursor:pointer;background:transparent;color:var(--mid);font-weight:800;font-size:12px;transition:all 0.15s;display:flex;align-items:center;justify-content:center;gap:6px;">Orange Flags<span class="tab-count" style="background:var(--light);color:var(--mid);border-radius:20px;padding:1px 7px;font-size:11px;font-weight:900;">0</span></button>
+      <button class="tab-btn f-body" data-tab="new" onclick="setTab('new')" style="flex:1;padding:9px 4px;border-radius:11px;border:none;cursor:pointer;background:transparent;color:var(--mid);font-weight:800;font-size:12px;transition:all 0.15s;display:flex;align-items:center;justify-content:center;gap:6px;">New Campaigns<span class="tab-count" style="background:var(--light);color:var(--mid);border-radius:20px;padding:1px 7px;font-size:11px;font-weight:900;">0</span></button>
+      <button class="tab-btn f-body" data-tab="all" onclick="setTab('all')" style="flex:1;padding:9px 4px;border-radius:11px;border:none;cursor:pointer;background:transparent;color:var(--mid);font-weight:800;font-size:12px;transition:all 0.15s;display:flex;align-items:center;justify-content:center;gap:6px;">All Campaigns<span class="tab-count" style="background:var(--light);color:var(--mid);border-radius:20px;padding:1px 7px;font-size:11px;font-weight:900;">0</span></button>
+    </div>
+
+    <!-- SECTION HEADING -->
+    <div style="margin-bottom:12px;">
+      <h2 id="section-heading" class="f-recoleta" style="font-size:20px;font-weight:400;color:var(--dark);margin:0;">✅ Today's Action Items</h2>
+    </div>
+
+    <!-- CAMPAIGN LIST -->
+    <div id="campaign-list" style="background:white;border-radius:16px;border:1.5px solid var(--light);overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.05);">
+      <div class="f-body" style="text-align:center;padding:48px 20px;color:var(--mid);font-size:15px;">Loading campaigns…</div>
+    </div>
+
+    <!-- FOOTER -->
+    <div style="text-align:center;margin-top:36px;padding-top:20px;border-top:1px solid var(--light);">
+      <p class="f-body" style="font-size:11px;color:var(--mid);margin:0;">Simple Creator Co · SCC Ads Dashboard · Meta via Two Minute Reports + Hyros</p>
+      <p class="f-body" style="font-size:11px;color:var(--mid);margin:4px 0 0;">Always review before executing. You're in control. ✨</p>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════
+   SCC Ads Dashboard — Script
+   ══════════════════════════════════════════════════════════ */
+
+/* ── Config ─────────────────────────────────────────────── */
+const META_SHEET_ID  = '1zUVhp_JUob-8PNASevaGqXyMxHl1E6zvCCNIxK_JLsM';
+const HYROS_SHEET_Y  = '1k_DQPkTVzSdAeLcoULFNk-xOaneOn-equSXl8-LAihk';
+const HYROS_SHEET_7  = '1SeOZj9T-d4EeszC3bA5yFgGPNUicIknopUM6xTG_eA8';
+const HYROS_SHEET_30 = '11uNkbn5yKLVlBJ5BH2FjDVSM_TolUJzTJNgdg8UmghY';
+const API_KEY        = 'AIzaSyDCo16IwVpVgHxs86yIh_njUO-KVZFdtqc';
+
+// Hyros columns (confirmed from live sheet):
+// A=0:Name  B=1:Status  C=2:Budget  D=3:Clicks  E=4:AdSpend
+// F=5:TotalRevenue  G=6:Revenue  H=7:Profit  I=8:NetProfit  J=9:Sales  K=10:ROAS
+const H_NAME  = 0;
+const H_SPEND = 4;
+const H_REV   = 5;   // "Total Revenue" column
+const H_SALES = 9;
+const H_ROAS  = 10;
+
+// Orange flag threshold (below this = flag; below 1.0 + both sources = turn off)
+const ORANGE_THRESHOLD = 1.25;
+const TURN_OFF_THRESHOLD = 0.75;
+const SCALE_THRESHOLD  = 1.4;
+
+/* ── State ───────────────────────────────────────────────── */
+let campaigns      = [];
+// Total row from each Hyros window — used for summary cards + chart
+let hyrosTotals    = { y: null, d7: null, d30: null };
+// Per-day Hyros revenue derived by distributing window totals by Meta spend share
+// shape: { 'YYYY-MM-DD': hyrosRev }
+let hyrosDailyRev  = {};
+
+let currentRange   = 'd7';
+let currentTab     = 'actions';
+let currentChart   = 'spend';
+let checked        = {};
+let trendChartInst = null;
+let allMetaRows    = []; // all raw Meta rows for chart spend (unfiltered)
+
+/* ── Formatters ──────────────────────────────────────────── */
+const fmtCurrency = v => (v == null || v === '') ? '—' : '$' + Number(v).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0});
+const fmtRoas     = v => v == null ? '—' : Number(v).toFixed(2);
+const fmtPct      = v => v == null ? '—' : Number(v).toFixed(1) + '%';
+const fmtDollar   = v => v == null ? '—' : '$' + Number(v).toFixed(2);
+
+function roasColor(v) {
+  if (v == null)            return '#4A5858';
+  if (v >= SCALE_THRESHOLD) return '#6BAF8A';
+  if (v >= 1.0)             return '#F4A24A';
+  return '#E07070';
+}
+
+function isDupDouble(name) { return /[$]50|[$]100|[$]200/.test(name); }
+
+function getScaleAction(c) {
+  if (c.status !== 'duplicate' && c.status !== 'scale_vertical') return '';
+  return isDupDouble(c.name)
+    ? `D&D → $${c.budget * 2}/day`
+    : `$${c.budget} → $${Math.round(c.budget * 1.09)}/day (+9%)`;
+}
+
+function roasKeyFor(r) {
+  return { y:'roasYest', d3:'roas3', d7:'roas7', d14:'roas14', d30:'roas30', custom:'roas14' }[r] || 'roas7';
+}
+function spendKey(r) { return r === 'custom' ? 'd14' : r; }
+
+/* ── Date helpers ────────────────────────────────────────── */
+function parseDate(s) {
+  if (!s) return null;
+  const p = s.split('-').map(Number);
+  if (p.length === 3 && !isNaN(p[0])) return new Date(p[0], p[1]-1, p[2]);
+  const p2 = s.split('/').map(Number);
+  if (p2.length === 3 && !isNaN(p2[2])) return new Date(p2[2], p2[0]-1, p2[1]);
+  return null;
+}
+function daysAgo(n) {
+  const t = new Date(); t.setHours(0,0,0,0);
+  const d = new Date(t); d.setDate(d.getDate() - n); return d;
+}
+function dateKey(d) {
+  // Returns 'YYYY-MM-DD' string for a Date object
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+/* ── Misc helpers ────────────────────────────────────────── */
+function extractIdFromName(name) {
+  const m = (name||'').match(/\(ID:\s*(\d+)\)/i);
+  return m ? String(parseInt(m[1], 10)) : null;
+}
+function cleanNum(s) {
+  const n = parseFloat((s||'').toString().replace(/[$,%\s]/g,'').trim());
+  return isNaN(n) ? null : n;
+}
+
+/* ── Fetch ───────────────────────────────────────────────── */
+async function fetchSheet(sheetId, range) {
+  // range can be 'TabName!A:K' or just 'A:K' (first tab)
+  const enc = encodeURIComponent(range);
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${enc}?key=${API_KEY}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    const err = await res.json().catch(()=>({}));
+    throw new Error(`Sheets ${res.status}: ${err?.error?.message||''}`);
+  }
+  return (await res.json()).values || [];
+}
+
+/* ── Parse Hyros sheet ───────────────────────────────────── */
+// Hyros sheets have no date column — they're window totals.
+// Returns: { campaignMap, total }
+function parseHyrosSheet(rows) {
+  if (!rows || rows.length < 2) return { campaignMap:{}, total:null };
+
+  const campaignMap = {};
+  let total = null;
+
+  for (const row of rows.slice(1)) {
+    const name = (row[H_NAME]||'').trim();
+    if (!name) continue;
+
+    const entry = {
+      rev:   cleanNum(row[H_REV]),
+      roas:  cleanNum(row[H_ROAS]),
+      spend: cleanNum(row[H_SPEND]),
+      sales: cleanNum(row[H_SALES]),
+    };
+
+    if (name.toLowerCase() === 'total') {
+      total = entry;
+      continue;
+    }
+
+    // Index by numeric ID (most reliable match key)
+    const id = extractIdFromName(name);
+    if (id) campaignMap[`id:${id}`] = entry;
+
+    // Also by lowercase name
+    campaignMap[`name:${name.toLowerCase()}`] = entry;
+  }
+
+  return { campaignMap, total };
+}
+
+/* ── Match Meta campaign → Hyros entry ──────────────────── */
+function matchHyros(metaName, hyrosParsed) {
+  if (!hyrosParsed || !hyrosParsed.campaignMap) return null;
+  const { campaignMap } = hyrosParsed;
+
+  // Speci// Special case: MTS CBO group — sum all Hyros entries with "(CBO)" in name
+  if (metaName === 'MTS CBO') {
+    let rev=0, spend=0, sales=0, roasNumer=0, found=0;
+    for (const [key, val] of Object.entries(campaignMap)) {
+      if (!key.startsWith('name:')) continue;
+      const entryName = key.slice(5); // strip 'name:' prefix before regex test
+      if (!/\(cbo\)/i.test(entryName)) continue;
+      rev      += val.rev   || 0;
+      spend    += val.spend || 0;
+      sales    += val.sales || 0;
+      roasNumer+= (val.roas || 0) * (val.spend || 0);
+      found++;
+    }
+    if (found > 0) {
+      const roas = spend > 0 ? parseFloat((roasNumer / spend).toFixed(4)) : null;
+      return { rev, spend, sales, roas };
+    }
+    return null;
+  }
+
+  // 1. ID match (most reliable — IDs appear in both systems)
+  const metaId = extractIdFromName(metaName);
+  if (metaId && campaignMap[`id:${metaId}`]) return campaignMap[`id:${metaId}`];
+
+  // 2. Exact lowercase name match
+  const lower = metaName.toLowerCase();
+  if (campaignMap[`name:${lower}`]) return campaignMap[`name:${lower}`];
+
+  // 3. Fuzzy word overlap (for campaigns without ID tags)
+  const metaWords = lower.replace(/[^\w\s]/g,' ').split(/\s+/).filter(w => w.length > 3);
+  let best = null, bestScore = 0;
+  for (const [key, val] of Object.entries(campaignMap)) {
+    if (!key.startsWith('name:')) continue;
+    const hWords = key.slice(5).replace(/[^\w\s]/g,' ').split(/\s+/).filter(w => w.length > 3);
+    const matches = metaWords.filter(w => hWords.includes(w)).length;
+    const score   = metaWords.length > 0 ? matches / metaWords.length : 0;
+    if (score > bestScore && score >= 0.45) { best = val; bestScore = score; }
+  }
+  return best;
+}
+
+/* ── Build daily Hyros revenue ───────────────────────────── */
+// Hyros only gives window totals (no daily breakdown).
+// Strategy: distribute the 7-day Hyros total proportionally across days
+// using each day's Meta spend share within that window.
+// This gives a reasonable daily Hyros estimate for the chart.
+function buildHyrosDailyRev(metaRows, hyros7Total) {
+  if (!hyros7Total || !hyros7Total.rev) return {};
+
+  const cutoff = daysAgo(7);
+  const dailySpend = {};
+
+  for (const row of (metaRows||[]).slice(1)) {
+    const d = parseDate(row[0]);
+    if (!d || d < cutoff) continue;
+    const k = dateKey(d);
+    dailySpend[k] = (dailySpend[k]||0) + (parseFloat(row[4])||0);
+  }
+
+  const totalSpend = Object.values(dailySpend).reduce((a,b)=>a+b, 0);
+  if (totalSpend === 0) return {};
+
+  const result = {};
+  const hyrosTotal7Rev = hyros7Total.rev;
+  for (const [k, spend] of Object.entries(dailySpend)) {
+    result[k] = Math.round((spend / totalSpend) * hyrosTotal7Rev);
+  }
+  return result;
+}
+
+/* ── Parse Creative Ladders ──────────────────────────────── */
+// We try multiple strategies to extract (ID, LaunchDate) from each row:
+//  1. Dedicated ID column + dedicated date column
+//  2. ID embedded in campaign name column e.g. "(ID: 071)"
+//  3. Any cell that looks like a bare number for ID, any cell that looks like a date
+// This is intentionally liberal so partial or unusual column layouts still work.
+function parseLadderRows(rows) {
+  if (!rows || rows.length < 2) return {};
+
+  const header = rows[0].map(h => (h||'').trim().toLowerCase());
+
+  // Find columns by header name
+  const iId   = header.findIndex(h => h === 'id' || h === 'campaign id' || h === 'campaign_id');
+  const iDate = header.findIndex(h =>
+    h.includes('launch') || h.includes('start') || h.includes('date') || h.includes('created'));
+  let iName   = header.findIndex(h => h.includes('campaign') && h.includes('name'));
+  if (iName < 0) iName = header.findIndex(h => h.includes('name'));
+
+  const map = {};
+
+  for (const row of rows.slice(1)) {
+    if (!row || row.every(c => !(c||'').trim())) continue;
+
+    let id = null;
+    let launchDate = null;
+
+    // Strategy 1: dedicated ID column
+    if (iId >= 0 && row[iId]) {
+      const raw = (row[iId]||'').trim().replace(/^0+/, '');
+      if (/^\d+$/.test(raw)) id = raw;
+    }
+
+    // Strategy 2: ID embedded in name column
+    if (!id && iName >= 0 && row[iName]) {
+      const m = (row[iName]||'').match(/\(ID:\s*(\d+)\)/i);
+      if (m) id = String(parseInt(m[1], 10));
+    }
+
+    // Strategy 3: scan all cells for a pattern like "(ID: 071)" or bare number in first few cols
+    if (!id) {
+      for (let ci = 0; ci < Math.min(row.length, 6); ci++) {
+        const cell = (row[ci]||'').trim();
+        const m = cell.match(/\(ID:\s*(\d+)\)/i);
+        if (m) { id = String(parseInt(m[1], 10)); break; }
+        // Bare number that looks like an ID (1–4 digits)
+        if (/^0*\d{1,4}$/.test(cell) && cell !== '') {
+          id = String(parseInt(cell, 10));
+          break;
+        }
+      }
+    }
+
+    if (!id || id === '0') continue;
+
+    // Get launch date from dedicated column
+    if (iDate >= 0 && row[iDate]) {
+      launchDate = parseDate(row[iDate]);
+    }
+
+    // Fallback: scan all cells for a date-like value
+    if (!launchDate) {
+      for (const cell of row) {
+        const d = parseDate((cell||'').trim());
+        if (d && d.getFullYear() >= 2024 && d <= new Date()) {
+          launchDate = d;
+          break;
+        }
+      }
+    }
+
+    if (launchDate) map[id] = launchDate;
+  }
+
+  return map;
+}
+
+/* ── Flag insights ───────────────────────────────────────── */
+function generateFlagInsight(c) {
+  const m7=c.meta.roas7, m14=c.meta.roas14, m30=c.meta.roas30, mY=c.meta.roasYest;
+  const h7=c.hyros.roas7, h30=c.hyros.roas30, hY=c.hyros.roasYest;
+  const reasons = [];
+  const isOff = c.status === 'turn_off';
+
+  if (isOff) {
+    if (h7!=null && h7<1.0) reasons.push(`Hyros 7-day ROAS ${h7.toFixed(2)} — below break-even.`);
+    if (m7!=null && m7<1.0) reasons.push(`Meta 7-day ROAS ${m7.toFixed(2)} — below break-even.`);
+    if ((h30??m30)!=null && (h30??m30)<1.0) reasons.push(`30-day ROAS also below 1.0 — not a temporary dip.`);
+    if (c.meta.cpm!=null && c.meta.cpm>35) reasons.push(`CPM $${c.meta.cpm.toFixed(2)} signals severe audience fatigue.`);
+    if (!reasons.length) reasons.push('Both Meta and Hyros below break-even. Spending more than it returns.');
+    return reasons.join(' ');
+  }
+
+  // Yesterday recovery — kept as orange flag instead of turn-off
+  const bestY = hY ?? mY;
+  if (bestY != null && bestY >= 1.0) {
+    reasons.push(`⚡ Yesterday's ROAS ${bestY.toFixed(2)} is above break-even — keeping as orange flag instead of turning off. Watch for 1–2 more days.`);
+  }
+
+  // Attribution gap
+  if (h7!=null && m7!=null && (m7-h7)>0.4)
+    reasons.push(`⚠ Attribution gap: Meta reports ${m7.toFixed(2)} but Hyros shows ${h7.toFixed(2)} — ${(m7-h7).toFixed(2)} difference.`);
+
+  // Declining trend
+  const long=h30??m30, mid=h7??m7;
+  if (long!=null && mid!=null && mid < long-0.15)
+    reasons.push(`Trending down: ${mid.toFixed(2)} (7-day) vs ${long.toFixed(2)} (30-day).`);
+
+  // Yesterday recovering
+  const best7=h7??m7, bestY=hY??mY;
+  if (bestY!=null && best7!=null && bestY>=SCALE_THRESHOLD && best7<SCALE_THRESHOLD)
+    reasons.push(`Yesterday ROAS ${bestY.toFixed(2)} is strong — 7-day average pulled down by earlier days.`);
+
+  // Borderline
+  if (!reasons.length) {
+    const r=h7??m7;
+    if (r!=null) reasons.push(`7-day ROAS ${r.toFixed(2)} — above break-even but below ${SCALE_THRESHOLD} scale threshold. Monitor 1–2 more days.`);
+  }
+
+  if (c.meta.cpm!=null && c.meta.cpm>30)
+    reasons.push(`CPM $${c.meta.cpm.toFixed(2)} — watch for audience fatigue.`);
+
+  return reasons.join(' ');
+}
+
+/* ── Main transform ──────────────────────────────────────── */
+// Meta col layout: A=0:Date B=1:CampaignName C=2:AdName D=3:Budget
+// E=4:Spend F=5:Impressions G=6:Reach H=7:CPM I=8:Clicks J=9:CPC
+// K=10:CTR L=11:Purchases M=12:ROAS(pre-calc) N=13:PurchaseValue
+function transformMetaRows(rows, hyrosYP, hyros7P, hyros30P, ladderMap) {
+  if (!rows.length) return [];
+
+  const cutoffs = { y:daysAgo(1), d3:daysAgo(3), d7:daysAgo(7), d14:daysAgo(14), d30:daysAgo(30) };
+
+  // Group ad-level rows by campaign name.
+  // Special rule: any campaign with "(CBO)" in the name is grouped together
+  // under the display name "MTS CBO" so they aggregate as one campaign.
+  const CBO_KEY = 'MTS CBO';
+  const byName = {};
+  for (const row of rows.slice(1)) {
+    const rawName = (row[1]||'').trim();
+    const ds      = (row[0]||'').trim();
+    if (!rawName || !ds) continue;
+    const name = /\(CBO\)/i.test(rawName) ? CBO_KEY : rawName;
+    if (!byName[name]) byName[name] = [];
+    byName[name].push(row);
+  }
+
+  const result = [];
+
+  for (const [name, cRows] of Object.entries(byName)) {
+    const budget = parseFloat(cRows[cRows.length-1]?.[3]) || 0;
+
+    const windowAgg = since => {
+      let spend=0, purchases=0, cpmSum=0, cpcSum=0, ctrSum=0, wRoas=0, n=0;
+      for (const row of cRows) {
+        const rd = parseDate(row[0]);
+        if (!rd || rd < since) continue;
+        const s    = parseFloat(row[4])  || 0;
+        const roas = parseFloat(row[12]) || 0;
+        spend     += s;
+        purchases += parseFloat(row[11]) || 0;
+        cpmSum    += parseFloat(row[7])  || 0;
+        cpcSum    += parseFloat(row[9])  || 0;
+        ctrSum    += parseFloat(row[10]) || 0;
+        wRoas     += roas * s;   // spend-weighted ROAS
+        n++;
+      }
+      return {
+        spend:     Math.round(spend),
+        purchases: Math.round(purchases),
+        roas:      spend > 0 ? parseFloat((wRoas/spend).toFixed(4)) : null,
+        cpm:       n ? cpmSum/n : null,
+        cpc:       n ? cpcSum/n : null,
+        ctr:       n ? ctrSum/n : null,
+      };
+    };
+
+    const yw   = windowAgg(cutoffs.y);
+    const d3w  = windowAgg(cutoffs.d3);
+    const d7w  = windowAgg(cutoffs.d7);
+    const d14w = windowAgg(cutoffs.d14);
+    const d30w = windowAgg(cutoffs.d30);
+
+    // Skip $0 spend yesterday — campaign is off
+    if (yw.spend === 0) continue;
+
+    // New campaign via Creative Ladders (match by ID)
+    const campId = extractIdFromName(name);
+    let isNew=false, daysWatching=0, launchDate=null;
+    if (campId && ladderMap[campId]) {
+      launchDate   = ladderMap[campId];
+      const today  = new Date(); today.setHours(0,0,0,0);
+      daysWatching = Math.max(0, Math.floor((today - launchDate) / 86400000));
+      isNew        = daysWatching < 4;
+    } else {
+      // Fallback: count distinct days with spend in last 7 days
+      const daysWithData = new Set(
+        cRows
+          .filter(r => { const d=parseDate(r[0]); return d && d >= cutoffs.d7 && parseFloat(r[4])>0; })
+          .map(r => r[0])
+      ).size;
+      daysWatching = daysWithData;
+      // Consider "new" if fewer than 4 days of actual spend data in 7-day window
+      // OR if no 14-day data exists (campaign started within last 7 days)
+      isNew = daysWithData < 4 || d14w.spend === 0;
+    }
+
+    // Match Hyros data — ID is the primary key
+    const hY  = matchHyros(name, hyrosYP)  || {};
+    const h7  = matchHyros(name, hyros7P)  || {};
+    const h30 = matchHyros(name, hyros30P) || {};
+
+    const hyros = {
+      roasYest: hY.roas  ?? null,
+      roas3:    null,
+      roas7:    h7.roas  ?? null,
+      roas14:   null,
+      roas30:   h30.roas ?? null,
+      rev: {
+        y:   Math.round(hY.rev  || 0) || null,
+        d3:  null,
+        d7:  Math.round(h7.rev  || 0) || null,
+        d14: null,
+        d30: Math.round(h30.rev || 0) || null,
+      },
+      sales: {
+        y:   hY.sales  ?? null,
+        d7:  h7.sales  ?? null,
+        d30: h30.sales ?? null,
+      },
+    };
+
+    // ── Status logic ──────────────────────────────────────────
+    // IG Followers campaigns are traffic-only — never scale or turn off
+    const isTrafficOnly = /ig followers/i.test(name);
+
+    // Primary signal: use 3-day window (more responsive), prefer Hyros over Meta
+    // Fall back to 7-day if 3-day is null (e.g. campaign paused mid-week)
+    const primary3 = hyros.roas3  ?? d3w.roas;
+    const primary7 = hyros.roas7  ?? d7w.roas;  // kept for turn-off logic
+    const primaryP = primary3 ?? primary7;        // "primary" for scale decisions
+    const primaryY = hyros.roasYest ?? yw.roas;
+
+    // Is yesterday strong even if 3-day average is below threshold? (recovering from dip)
+    const recovering = primaryY != null && primaryY >= SCALE_THRESHOLD;
+
+    let status;
+    if (isNew) {
+      // New campaigns always go to watch — never turn off or scale yet
+      status = 'new_watch';
+    } else if (isTrafficOnly) {
+      // Traffic-only campaigns: show in All Campaigns only, neutral status
+      status = 'hold';
+    } else if (primaryP === null) {
+      status = 'hold';
+    } else if (primaryP >= SCALE_THRESHOLD || (recovering && primaryP >= 1.0)) {
+      // Scale if 3-day ≥ 1.4, OR if yesterday ≥ 1.4 and 3-day ≥ 1.0 (recovering)
+      // D&D cap: never D&D at $200+ — always vertical scale instead
+      const canDD = isDupDouble(name) && budget < 200;
+      status = canDD ? 'duplicate' : 'scale_vertical';
+    } else if (primaryP >= ORANGE_THRESHOLD) {
+      // 1.25–1.39 → orange flag
+      status = 'orange_flag';
+    } else if (primaryP >= 1.0) {
+      // 1.0–1.24 → orange flag
+      status = 'orange_flag';
+    } else {
+      // Below 1.0 — but if yesterday is above break-even, keep as orange flag
+      if (primaryY != null && primaryY >= 1.0) {
+        // Yesterday recovering — don't turn off, flag instead
+        status = 'orange_flag';
+      } else {
+        // Turn off only if BOTH Meta AND Hyros confirm below 0.75
+        const metaR7  = d7w.roas;
+        const hyrosR7 = hyros.roas7;
+        if (metaR7 != null && hyrosR7 != null) {
+          status = (metaR7 < TURN_OFF_THRESHOLD && hyrosR7 < TURN_OFF_THRESHOLD)
+            ? 'turn_off' : 'orange_flag';
+        } else if (metaR7 != null && hyrosR7 == null) {
+          status = 'orange_flag';
+        } else {
+          status = (hyrosR7 != null && hyrosR7 < TURN_OFF_THRESHOLD) ? 'turn_off' : 'orange_flag';
+        }
+      }
+    }
+
+    const campaign = {
+      id: campId || String(result.length+1).padStart(3,'0'),
+      name, budget, isNew, daysWatching, launchDate,
+      sales: d7w.purchases,
+      meta:  {
+        roasYest: yw.roas,   roas3: d3w.roas,  roas7: d7w.roas,
+        roas14:   d14w.roas, roas30: d30w.roas,
+        spend: { y:yw.spend,   d3:d3w.spend,  d7:d7w.spend,  d14:d14w.spend,  d30:d30w.spend },
+        cpm: d7w.cpm, cpc: d7w.cpc, ctr: d7w.ctr,
+      },
+      hyros,
+      status, flag: null, _rawRows: cRows,
+      watchNote: isNew ? (() => {
+        const age    = daysWatching === 0 ? 'today' : daysWatching + ' day' + (daysWatching!==1?'s':'') + ' ago';
+        const mR7    = d7w.roas, mRY = yw.roas;
+        const hR7    = hyros.roas7, hRY = hyros.roasYest;
+        const bestR7 = hR7 ?? mR7;
+        const bestRY = hRY ?? mRY;
+        let trend = '';
+        if (bestRY != null && bestR7 != null) {
+          if (bestRY >= 1.4)       trend = ` Yesterday's ROAS is ${bestRY.toFixed(2)} — strong early signal. ✅`;
+          else if (bestRY >= 1.0)  trend = ` Yesterday's ROAS is ${bestRY.toFixed(2)} — above break-even, watching.`;
+          else                     trend = ` Yesterday's ROAS is ${bestRY.toFixed(2)} — below break-even so far. Give it a few more days.`;
+        } else if (bestRY != null) {
+          trend = ` Yesterday's ROAS: ${bestRY.toFixed(2)}.`;
+        }
+        const salesNote = d7w.purchases > 0
+          ? ` ${d7w.purchases} Meta sale${d7w.purchases!==1?'s':''} so far.`
+          : ' No sales yet — normal for day 1–2.';
+        return `Launched ${age}. Watching for 3+ days before making any decisions.${trend}${salesNote}`;
+      })() : null,
+    };
+
+    if (['orange_flag','turn_off'].includes(status)) {
+      campaign.flag = { reason: generateFlagInsight(campaign) };
+    }
+
+    result.push(campaign);
+  }
+  return result;
+}
+
+/* ── Chart ───────────────────────────────────────────────── */
+function buildChartData() {
+  const days   = { y:1, d3:3, d7:7, d14:14, d30:30, custom:14 }[currentRange] || 7;
+  const cutoff = daysAgo(days);
+  const metaByDay = {};
+
+  // Aggregate Meta spend per day from ALL raw rows (includes $0-yesterday campaigns)
+  // Use normalized YYYY-MM-DD key so all date formats aggregate to the same bucket
+  for (const row of allMetaRows.slice(1)) {
+    const rd = parseDate(row[0]);
+    if (!rd || rd < cutoff) continue;
+    const k = dateKey(rd);  // always 'YYYY-MM-DD' — avoids format mismatch & sort issues
+    if (!metaByDay[k]) metaByDay[k] = { spend:0 };
+    metaByDay[k].spend += parseFloat(row[4]) || 0;
+  }
+
+  // Get total Meta spend in window to compute Hyros daily distribution
+  const totalMetaSpend = Object.values(metaByDay).reduce((a,b)=>a+b.spend, 0);
+
+  // Hyros total revenue for this window
+  const hyrosWindow = { y:'y', d3:'y', d7:'d7', d14:'d7', d30:'d30', custom:'d7' }[currentRange] || 'd7';
+  const ht = hyrosTotals[hyrosWindow];
+  const hyrosTotalRev = ht?.rev ?? 0;
+
+  return Object.entries(metaByDay).sort((a,b)=>a[0].localeCompare(b[0])).map(([ds, vals]) => {
+    const d = parseDate(ds);
+    const label = days === 1 ? 'Yesterday'
+      : d.toLocaleString('en-US',{month:'short'}) + ' ' + d.getDate();
+    const spend = Math.round(vals.spend);
+    // Distribute Hyros window revenue proportionally by each day's Meta spend share
+    const hyrosRev = totalMetaSpend > 0
+      ? Math.round((vals.spend / totalMetaSpend) * hyrosTotalRev)
+      : 0;
+    // Daily Hyros ROAS = day's estimated Hyros revenue / day's Meta spend
+    // This gives a meaningful day-by-day trend line (not a flat window average)
+    const roas = spend > 0 ? parseFloat((hyrosRev / spend).toFixed(2)) : 0;
+    return { label, spend, rev: hyrosRev, roas };
+  });
+}
+
+function renderChart() {
+  const canvas = document.getElementById('trend-chart');
+  if (trendChartInst) { trendChartInst.destroy(); trendChartInst = null; }
+  const data   = buildChartData();
+  const labels = data.map(d => d.label);
+  const isRoas = currentChart === 'roas';
+  document.getElementById('roas-legend').style.display = isRoas ? 'flex' : 'none';
+
+  const tooltipCfg = {
+    backgroundColor:'white', titleColor:'#4A5858', bodyColor:'#2C3535',
+    borderColor:'#E8F0ED', borderWidth:1,
+    titleFont:{family:'Nunito',size:11,weight:'800'},
+    bodyFont:{family:'Nunito',size:12,weight:'700'},
+    padding:10, mode:'index', intersect:false,
+    filter: item => isRoas ? !['Break even','Scale threshold'].includes(item.dataset.label) : true,
+    callbacks: {
+      label: ctx => {
+        if (isRoas) return ` ${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)}x`;
+        if (ctx.dataset.label==='Ad Spend')      return ` Spend: $${Math.round(ctx.parsed.y).toLocaleString()}`;
+        if (ctx.dataset.label==='Hyros Revenue') return ` Revenue: $${Math.round(ctx.parsed.y).toLocaleString()}`;
+        return '';
+      }
+    }
+  };
+
+  const xScale = { grid:{display:false}, border:{display:false}, ticks:{font:{family:'Nunito',size:11},color:'#4A5858'} };
+  const yScale = { grid:{color:'#E8F0ED'}, border:{display:false},
+    ticks:{font:{family:'Nunito',size:11},color:'#4A5858', callback: v => isRoas ? v.toFixed(1) : `$${(v/1000).toFixed(0)}k`} };
+
+  let datasets;
+  if (!isRoas) {
+    datasets = [
+      {label:'Ad Spend',     data:data.map(d=>d.spend), borderColor:'#889CA2', borderWidth:2.5, pointRadius:3, pointBackgroundColor:'#889CA2', tension:0.3, fill:false},
+      {label:'Hyros Revenue',data:data.map(d=>d.rev),   borderColor:'#6BAF8A', borderWidth:2.5, pointRadius:3, pointBackgroundColor:'#6BAF8A', tension:0.3, fill:false},
+    ];
+  } else {
+    datasets = [
+      {label:'Break even',     data:data.map(()=>1.0), borderColor:'#C0CDD0', borderWidth:1.5, borderDash:[4,4], pointRadius:0, fill:false},
+      {label:'Scale threshold',data:data.map(()=>1.4), borderColor:'#F4A24A', borderWidth:1.5, borderDash:[4,4], pointRadius:0, fill:false},
+      {label:'ROAS',           data:data.map(d=>d.roas), borderColor:'#F49C8E', borderWidth:2.5, pointRadius:4, pointBackgroundColor:'#F49C8E', tension:0.3, fill:false},
+    ];
+  }
+
+  trendChartInst = new Chart(canvas.getContext('2d'), {
+    type:'line', data:{labels, datasets},
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}, tooltip:tooltipCfg},
+      scales: isRoas ? {x:xScale, y:{...yScale,min:0}} : {x:xScale, y:yScale} }
+  });
+}
+
+/* ── Badge ───────────────────────────────────────────────── */
+function badgeHTML(status) {
+  const M = {
+    scale_vertical:{l:'Scale 9%',          bg:'#EFF7F3',color:'#6BAF8A',bd:'#6BAF8A'},
+    duplicate:     {l:'Duplicate & Double', bg:'#EFF7F3',color:'#6BAF8A',bd:'#6BAF8A'},
+    orange_flag:   {l:'▶ Orange Flag',     bg:'#FDF4E7',color:'#F4A24A',bd:'#F4A24A'},
+    turn_off:      {l:'⛔ Turn Off',        bg:'#FCF0F0',color:'#E07070',bd:'#E07070'},
+    new_watch:     {l:'👁 Watching',        bg:'#F0F4F6',color:'#889CA2',bd:'#889CA2'},
+    hold:          {l:'Hold',              bg:'#E8F0ED',color:'#4A5858',bd:'#B3DCDA'},
+  };
+  const s = M[status] || M.hold;
+  return `<span class="f-body" style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:800;letter-spacing:0.04em;background:${s.bg};color:${s.color};border:1px solid ${s.bd};text-transform:uppercase;white-space:nowrap;">${s.l}</span>`;
+}
+
+/* ── Dual ROAS widget ────────────────────────────────────── */
+function dualRoasHTML(meta, hyros, size=14) {
+  return `<div style="display:flex;gap:10px;align-items:center;flex-shrink:0;">
+    <div style="text-align:center;">
+      <div class="f-body" style="font-size:9px;color:#4A5858;font-weight:800;letter-spacing:0.07em;text-transform:uppercase;">Meta</div>
+      <div class="f-title" style="font-size:${size}px;font-weight:700;color:${roasColor(meta)};line-height:1.1;">${fmtRoas(meta)}</div>
+    </div>
+    <div style="width:1px;height:28px;background:#E8F0ED;"></div>
+    <div style="text-align:center;">
+      <div class="f-body" style="font-size:9px;color:#4A5858;font-weight:800;letter-spacing:0.07em;text-transform:uppercase;">Hyros</div>
+      <div class="f-title" style="font-size:${size}px;font-weight:700;color:${roasColor(hyros)};line-height:1.1;">${fmtRoas(hyros)}</div>
+    </div>
+  </div>`;
+}
+
+/* ── Campaign detail panel ───────────────────────────────── */
+function detailHTML(c) {
+  const sk = spendKey(currentRange);
+
+  // ── Spend & revenue ──
+  const metaSpend = c.meta.spend?.[sk] ?? 0;
+  // Hyros revenue for the window
+  const hyrosRevMap = { y:'y', d3:'y', d7:'d7', d14:'d7', d30:'d30', custom:'d7' };
+  const hRevKey = hyrosRevMap[currentRange] || 'd7';
+  const hyrosRev = c.hyros.rev?.[hRevKey] ?? null;
+  const hyrosSales = c.hyros.sales?.[hRevKey] ?? null;
+
+  // ── Flag / watch note ──
+  const flagH = c.flag ? `
+    <div style="background:${c.status==='turn_off'?'#FCF0F0':'#FDF4E7'};border:1px solid ${c.status==='turn_off'?'#E07070':'#F4A24A'};border-radius:10px;padding:11px 14px;margin-bottom:16px;">
+      <div class="f-body" style="font-size:11px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:6px;color:${c.status==='turn_off'?'#E07070':'#F4A24A'};">
+        ${c.status==='turn_off'?'⛔ Recommended: Turn Off':'🚩 Orange Flag — Watch Closely'}
+      </div>
+      <div class="f-body" style="font-size:13px;color:#2C3535;line-height:1.7;">${c.flag.reason}</div>
+    </div>` : '';
+
+  const launchStr = c.launchDate
+    ? c.launchDate.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : null;
+  const watchH = c.watchNote ? `
+    <div style="background:#F0F4F6;border:1px solid #889CA2;border-radius:10px;padding:11px 14px;margin-bottom:16px;">
+      <div class="f-body" style="font-size:11px;font-weight:800;color:#889CA2;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:4px;">
+        👁 Day ${c.daysWatching}${launchStr?' · Launched '+launchStr:''}
+      </div>
+      <div class="f-body" style="font-size:13px;color:#2C3535;line-height:1.7;">${c.watchNote}</div>
+    </div>` : '';
+
+  // ── ROAS windows — Yesterday / 7-Day / 30-Day only ──
+  // Hyros values: yesterday=hyrosYP, 7-day=hyros7P, 30-day=hyros30P
+  // These are already stored on c.hyros directly from the matched Hyros entries
+  const wins = [
+    {label:'Yesterday', mk:'roasYest', hk:'roasYest'},
+    {label:'7-Day',     mk:'roas7',    hk:'roas7'},
+    {label:'30-Day',    mk:'roas30',   hk:'roas30'},
+  ];
+  const roasWinsH = `
+    <div style="margin-bottom:16px;">
+      <div class="f-body" style="font-size:11px;font-weight:800;color:#4A5858;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:10px;">ROAS by Window</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+        ${wins.map(({label,mk,hk}) => {
+          const mv=c.meta[mk], hv=c.hyros[hk];
+          return `<div style="background:white;border-radius:10px;padding:12px 10px;border:1px solid #E8F0ED;text-align:center;">
+            <div class="f-body" style="font-size:10px;color:#4A5858;font-weight:800;letter-spacing:0.05em;margin-bottom:10px;text-transform:uppercase;">${label}</div>
+            <div class="f-body" style="font-size:9px;color:#889CA2;margin-bottom:1px;font-weight:700;">Meta</div>
+            <div class="f-recoleta" style="font-size:20px;font-weight:900;color:${roasColor(mv)};">${fmtRoas(mv)}</div>
+            <div style="height:1px;background:#E8F0ED;margin:8px 0;"></div>
+            <div class="f-body" style="font-size:9px;color:#F49C8E;margin-bottom:1px;font-weight:700;">Hyros</div>
+            <div class="f-recoleta" style="font-size:20px;font-weight:900;color:${roasColor(hv)};">${fmtRoas(hv)}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+
+  // ── Unified metrics block (no Meta/Hyros split) ──
+  const metrics = [
+    ['Spend',          fmtCurrency(metaSpend)],
+    ['Hyros Revenue',  fmtCurrency(hyrosRev)],
+    ['Hyros Sales',    hyrosSales != null ? String(Math.round(hyrosSales)) : '—'],
+    ['CPM',            fmtDollar(c.meta.cpm)],
+    ['CPC',            fmtDollar(c.meta.cpc)],
+    ['CTR',            fmtPct(c.meta.ctr)],
+  ];
+  const metricsH = `
+    <div style="background:white;border-radius:10px;padding:14px 16px;border:1px solid #E8F0ED;">
+      <div class="f-body" style="font-size:10px;font-weight:800;color:#4A5858;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:12px;">Metrics</div>
+      <div class="metrics-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+        ${metrics.map(([l,v]) => `
+          <div>
+            <div class="f-body" style="font-size:10px;color:#4A5858;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;margin-bottom:2px;">${l}</div>
+            <div class="f-body" style="font-size:15px;font-weight:800;color:#2C3535;">${v}</div>
+          </div>`).join('')}
+      </div>
+    </div>`;
+
+  return `<div class="camp-detail-inner" style="background:#FAF8F5;padding:18px 20px;border-top:1px solid #E8F0ED;">
+    ${flagH}${watchH}${roasWinsH}${metricsH}
+  </div>`;
+}
+
+/* ── Campaign row ────────────────────────────────────────── */
+function rowHTML(c) {
+  const rk    = roasKeyFor(currentRange);
+  const mR    = c.isNew ? c.meta.roasYest  : c.meta[rk];
+  const hR    = c.isNew ? c.hyros.roasYest : c.hyros[rk];
+  const isOff = c.status === 'turn_off';
+  const isChk = !!checked[c.id];
+  const sa    = getScaleAction(c);
+  const lb    = {scale_vertical:'#6BAF8A',duplicate:'#6BAF8A',orange_flag:'#F4A24A',turn_off:'#E07070',new_watch:'#889CA2',hold:'#E8F0ED'}[c.status]||'#E8F0ED';
+
+  return `<div style="border-bottom:1px solid #E8F0ED;" data-cid="${c.id}">
+    <div class="row-hover camp-row-inner" onclick="toggleExpand('${c.id}')"
+      style="display:flex;align-items:flex-start;gap:12px;padding:14px 18px;
+             background:${isChk?'#F6FAF7':'white'};opacity:${isChk?'0.55':'1'};
+             transition:all 0.15s;border-left:3px solid ${lb};cursor:pointer;">
+      ${currentTab==='actions'
+        ? `<div class="custom-cb${isChk?' on':''}" onclick="event.stopPropagation();toggleCheck('${c.id}')"></div>`
+        : ''}
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+          ${badgeHTML(c.status)}
+          <span class="f-body" style="font-size:11px;color:#4A5858;font-weight:700;">ID ${c.id} · $${c.budget}/day</span>
+        </div>
+        <div class="camp-name f-body" style="font-size:13px;font-weight:700;color:#2C3535;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.name}</div>
+        ${sa ? `<div class="f-body" style="font-size:12px;color:${isOff?'#E07070':'#6BAF8A'};font-weight:700;margin-top:3px;">${isOff?'⛔ ':''} ${sa}</div>` : ''}
+        ${c.isNew ? `<div class="f-body" style="font-size:12px;color:#889CA2;font-weight:600;margin-top:3px;">Day ${c.daysWatching} · ${c.sales>0?c.sales+' sales':'No sales yet'}</div>` : ''}
+        <div class="camp-right-mobile" style="display:none;align-items:center;justify-content:space-between;margin-top:8px;">
+          ${dualRoasHTML(mR, hR, 14)}
+          <span class="chevron" id="chv-mob-${c.id}">⌄</span>
+        </div>
+      </div>
+      <div class="camp-right" style="display:flex;align-items:center;gap:12px;flex-shrink:0;">
+        ${dualRoasHTML(mR, hR, 14)}
+        <span class="chevron" id="chv-${c.id}">⌄</span>
+      </div>
+    </div>
+    <div class="campaign-detail" id="det-${c.id}">${detailHTML(c)}</div>
+  </div>`;
+}
+
+/* ── UI interactions ─────────────────────────────────────── */
+function toggleExpand(id) {
+  const det=document.getElementById(`det-${id}`);
+  const chv=document.getElementById(`chv-${id}`);
+  const chvMob=document.getElementById(`chv-mob-${id}`);
+  if (!det) return;
+  const open=det.classList.toggle('open');
+  if (chv)    chv.classList.toggle('open',open);
+  if (chvMob) chvMob.classList.toggle('open',open);
+}
+function toggleCheck(id) { checked[id]=!checked[id]; renderCampaigns(); }
+
+/* ── Render helpers ──────────────────────────────────────── */
+function getShown() {
+  // Today's Actions: scale/D&D first, turn off last
+  const scale  = campaigns.filter(c=>['scale_vertical','duplicate'].includes(c.status));
+  const turnOff= campaigns.filter(c=>c.status==='turn_off');
+  const acts   = [...scale, ...turnOff];
+
+  const flag = campaigns.filter(c=>c.status==='orange_flag');
+  const nw   = campaigns.filter(c=>c.isNew);
+
+  // All Campaigns: hold/scale → orange → turn off → watching
+  const allSorted = [
+    ...campaigns.filter(c=>['hold','scale_vertical','duplicate'].includes(c.status)),
+    ...campaigns.filter(c=>c.status==='orange_flag'),
+    ...campaigns.filter(c=>c.status==='turn_off'),
+    ...campaigns.filter(c=>c.status==='new_watch'),
+  ];
+
+  return { actions:acts, flagged:flag, new:nw, all:allSorted }[currentTab] || allSorted;
+}
+
+function renderCampaigns() {
+  const shown = getShown();
+  document.getElementById('campaign-list').innerHTML = shown.length === 0
+    ? `<div class="f-body" style="text-align:center;padding:48px 20px;color:#4A5858;font-size:15px;">Nothing here today! 🎉</div>`
+    : shown.map(rowHTML).join('');
+}
+
+function renderSummary() {
+  const sk = spendKey(currentRange);
+  const metaSpend = campaigns.reduce((a,c)=>a+(c.meta.spend?.[sk]??0), 0);
+
+  // Hyros totals from Total row — pick closest window
+  const hw = { y:'y', d3:'y', d7:'d7', d14:'d7', d30:'d30', custom:'d7' }[currentRange] || 'd7';
+  const ht = hyrosTotals[hw];
+  const hyrosRev  = ht?.rev  ?? null;
+  const hyrosRoas = ht?.roas ?? null;
+
+  const rc = roasColor(hyrosRoas);
+  document.getElementById('card-spend').textContent     = fmtCurrency(metaSpend);
+  document.getElementById('card-hyros-rev').textContent = fmtCurrency(hyrosRev);
+  document.getElementById('card-roas').textContent      = fmtRoas(hyrosRoas);
+  document.getElementById('card-roas').style.color      = rc;
+  document.getElementById('card-roas-wrap').style.borderColor = rc;
+
+  const sc    = campaigns.filter(c=>['scale_vertical','duplicate'].includes(c.status)).length;
+  const at    = campaigns.filter(c=>['orange_flag','turn_off'].includes(c.status)).length;
+  const hasOff= campaigns.some(c=>c.status==='turn_off');
+  const atC   = hasOff ? '#E07070' : '#F4A24A';
+
+  document.getElementById('count-active').textContent = campaigns.length;
+  document.getElementById('count-scale').textContent  = sc;
+  document.getElementById('count-attn').textContent   = at;
+  document.getElementById('count-attn').style.color   = atC;
+  document.getElementById('attn-card').style.borderColor = atC;
+}
+
+function renderTabs() {
+  const counts = {
+    actions: campaigns.filter(c=>['scale_vertical','duplicate','turn_off'].includes(c.status)).length,
+    flagged: campaigns.filter(c=>c.status==='orange_flag').length,
+    new:     campaigns.filter(c=>c.isNew).length,
+    all:     campaigns.length,
+  };
+  document.querySelectorAll('[data-tab]').forEach(btn => {
+    const t=btn.dataset.tab, active=t===currentTab;
+    btn.style.background = active ? 'var(--navy)' : 'transparent';
+    btn.style.color      = active ? 'white'       : 'var(--mid)';
+    const ct = btn.querySelector('.tab-count');
+    if (ct) { ct.textContent=counts[t]??0; ct.style.background=active?'var(--coral)':'var(--light)'; ct.style.color=active?'white':'var(--mid)'; }
+  });
+  const headings = {
+    actions:"✅ Today's Action Items",
+    flagged:"🚩 Monitor daily. Don't make hasty calls.",
+    new:    "👁 New Campaigns — Under Watch",
+    all:    "📊 All Campaigns",
+  };
+  document.getElementById('section-heading').textContent = headings[currentTab] || '';
+}
+
+function renderRangeBtns() {
+  document.querySelectorAll('[data-range]').forEach(btn => {
+    const active=btn.dataset.range===currentRange;
+    btn.style.background  = active ? 'var(--navy)' : 'white';
+    btn.style.color       = active ? 'white'       : 'var(--mid)';
+    btn.style.borderColor = active ? 'var(--navy)' : 'var(--light)';
+  });
+  document.getElementById('custom-dates').style.display = currentRange==='custom' ? 'flex' : 'none';
+}
+
+function renderAll() { renderRangeBtns(); renderSummary(); renderTabs(); renderCampaigns(); renderChart(); }
+
+/* ── State setters ───────────────────────────────────────── */
+function setRange(r)    { currentRange=r; renderAll(); }
+function setTab(t)      { currentTab=t; renderTabs(); renderCampaigns(); }
+function setChartTab(t) {
+  currentChart=t;
+  const s=document.getElementById('ct-spend'), r=document.getElementById('ct-roas');
+  const on='var(--navy)', off='white', offC='var(--light)';
+  s.style.background=t==='spend'?on:off; s.style.color=t==='spend'?'white':'var(--mid)'; s.style.borderColor=t==='spend'?on:offC;
+  r.style.background=t==='roas'?on:off;  r.style.color=t==='roas'?'white':'var(--mid)';  r.style.borderColor=t==='roas'?on:offC;
+  renderChart();
+}
+
+/* ── Load data ───────────────────────────────────────────── */
+async function loadData() {
+  const st = document.getElementById('sync-status');
+  st.style.color='#B3DCDA'; st.style.opacity='1'; st.textContent='⟳ Syncing…';
+
+  try {
+    // Hyros sheets: fetch without a tab prefix so it targets the first (only) tab
+    const [metaRows, hyrosYRows, hyros7Rows, hyros30Rows, ladderRows] = await Promise.all([
+      fetchSheet(META_SHEET_ID,  'Meta Ads Data!A:N'),
+      fetchSheet(HYROS_SHEET_Y,  'A:K').catch(()=>[]),
+      fetchSheet(HYROS_SHEET_7,  'A:K').catch(()=>[]),
+      fetchSheet(HYROS_SHEET_30, 'A:K').catch(()=>[]),
+      fetchSheet(META_SHEET_ID,  'Creative Ladders!A:Z').catch(()=>[]),
+    ]);
+
+    const hyrosYP  = parseHyrosSheet(hyrosYRows);
+    const hyros7P  = parseHyrosSheet(hyros7Rows);
+    const hyros30P = parseHyrosSheet(hyros30Rows);
+    const ladderMap= parseLadderRows(ladderRows);
+
+    // Cache total rows for summary cards
+    hyrosTotals = {
+      y:   hyrosYP.total  ?? null,
+      d7:  hyros7P.total  ?? null,
+      d30: hyros30P.total ?? null,
+    };
+
+    allMetaRows = metaRows; // save for chart
+    const live = transformMetaRows(metaRows, hyrosYP, hyros7P, hyros30P, ladderMap);
+    if (live.length > 0) campaigns = live;
+
+    const now = new Date();
+    st.style.color='white'; st.style.opacity='0.75';
+    st.textContent=`✓ Live · ${now.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}`;
+  } catch(e) {
+    console.error('Load error:', e);
+    st.style.color='#F49C8E'; st.style.opacity='1'; st.textContent='⚠ Load error';
+  }
+
+  renderAll();
+}
+
+loadData();
+setInterval(loadData, 15 * 60 * 1000);
+</script>
+
+<script>
+// ── Auto-height broadcaster ───────────────────────────────
+// Posts the document's full height to the parent window so
+// Showit (or any iframe host) can resize the iframe to fit.
+function broadcastHeight() {
+  const h = document.documentElement.scrollHeight;
+  window.parent.postMessage({ type: 'scc-resize', height: h }, '*');
+}
+
+// Broadcast on load, after data renders, and on any resize
+window.addEventListener('load', broadcastHeight);
+window.addEventListener('resize', broadcastHeight);
+
+// Patch renderAll to also broadcast after every render
+const _origRenderAll = renderAll;
+window.renderAll = function() {
+  _origRenderAll();
+  setTimeout(broadcastHeight, 100); // slight delay so DOM has painted
+};
+// Also broadcast when campaign rows expand/collapse
+const _origToggle = toggleExpand;
+window.toggleExpand = function(id) {
+  _origToggle(id);
+  setTimeout(broadcastHeight, 250);
+};
+</script>
+</body>
+</html>
