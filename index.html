@@ -856,7 +856,7 @@ function transformMetaRows(rows, hyrosYP, hyros7P, hyros30P, ladderMap) {
       launchDate   = ladderMap[campId];
       const today  = new Date(); today.setHours(0,0,0,0);
       daysWatching = Math.max(0, Math.floor((today - launchDate) / 86400000));
-      isNew        = daysWatching < 4;
+      isNew        = daysWatching < 3; // Watch Day 1,2,3 only (daysWatching 0,1,2)
     } else {
       // Fallback: count distinct days with spend in last 7 days
       const daysWithData = new Set(
@@ -867,7 +867,7 @@ function transformMetaRows(rows, hyrosYP, hyros7P, hyros30P, ladderMap) {
       daysWatching = daysWithData;
       // Consider "new" if fewer than 4 days of actual spend data in 7-day window
       // OR if no 14-day data exists (campaign started within last 7 days)
-      isNew = daysWithData < 4 || d14w.spend === 0;
+      isNew = daysWithData < 3 || d14w.spend === 0;
     }
 
     // Match Hyros data — ID is the primary key
@@ -885,17 +885,20 @@ function transformMetaRows(rows, hyrosYP, hyros7P, hyros30P, ladderMap) {
       // but both are keyed as 'MTS CBO' in campDaySpend — so lookup works directly.
       const dayMap = campDaySpend[name] || {};
       if (Object.keys(dayMap).length === 0) return { roas: null, rev: null };
-      let campRev = 0, campSpend = 0;
+      let campRev = 0, campSpend = 0, daysWithHyros = 0;
       for (const [dk, sp] of Object.entries(dayMap)) {
         const rd = parseDate(dk);
         if (!rd || rd < cutoff || rd > today) continue;
+        campSpend += sp; // always count spend
         const totalSp     = dayTotalSpend[dk] || 0;
-        const dayHyrosRev = hyrosDailyMap[dk]  ?? 0;
-        if (dayHyrosRev === 0) continue; // no Hyros data for this day — skip
-        campSpend += sp;
-        campRev   += totalSp > 0 ? (sp / totalSp) * dayHyrosRev : 0;
+        const dayHyrosRev = hyrosDailyMap[dk];
+        if (dayHyrosRev != null && dayHyrosRev > 0 && totalSp > 0) {
+          campRev += (sp / totalSp) * dayHyrosRev;
+          daysWithHyros++;
+        }
       }
-      if (campSpend === 0) return { roas: null, rev: null };
+      // Need spend AND at least one day with Hyros data to compute ROAS
+      if (campSpend === 0 || daysWithHyros === 0) return { roas: null, rev: null };
       return { roas: parseFloat((campRev / campSpend).toFixed(4)), rev: Math.round(campRev) };
     }
     const hw3  = campHyrosWindow(3);
@@ -945,6 +948,9 @@ function transformMetaRows(rows, hyrosYP, hyros7P, hyros30P, ladderMap) {
     // Is yesterday strong even if 3-day average is below threshold? (recovering from dip)
     const recovering = primaryY != null && primaryY >= SCALE_THRESHOLD;
 
+    // Sales count for turn-off-after-watch logic
+    const totalSales = (d7w.purchases || 0);
+
     let status;
     if (isNew) {
       // New campaigns always go to watch — never turn off or scale yet
@@ -952,6 +958,9 @@ function transformMetaRows(rows, hyrosYP, hyros7P, hyros30P, ladderMap) {
     } else if (isTrafficOnly) {
       // Traffic-only campaigns: show in All Campaigns only, neutral status
       status = 'hold';
+    } else if (totalSales === 0 && daysWatching >= 3) {
+      // Just exited watch period with 0 sales — turn off immediately
+      status = 'turn_off';
     } else if (primaryP === null) {
       status = 'hold';
     } else if (primaryP >= SCALE_THRESHOLD || (recovering && primaryP >= 1.0)) {
@@ -1013,7 +1022,8 @@ function transformMetaRows(rows, hyrosYP, hyros7P, hyros30P, ladderMap) {
       hyros,
       status, flag: null, _rawRows: cRows,
       watchNote: isNew ? (() => {
-        const age    = daysWatching === 0 ? 'today' : daysWatching + ' day' + (daysWatching!==1?'s':'') + ' ago';
+        const dayNum = daysWatching + 1;
+        const age    = 'Day ' + dayNum + ' of 3';
         const mR7    = d7w.roas, mRY = yw.roas;
         const hR7    = hyros.roas7, hRY = hyros.roasYest;
         const bestR7 = hR7 ?? mR7;
@@ -1028,8 +1038,8 @@ function transformMetaRows(rows, hyrosYP, hyros7P, hyros30P, ladderMap) {
         }
         const salesNote = d7w.purchases > 0
           ? ` ${d7w.purchases} Meta sale${d7w.purchases!==1?'s':''} so far.`
-          : ' No sales yet — normal for day 1–2.';
-        return `Launched ${age}. Watching for 3+ days before making any decisions.${trend}${salesNote}`;
+          : ' No sales yet — will turn off if still 0 after Day 3.';
+        return `${age}. Watching until Day 4 before making decisions.${trend}${salesNote}`;
       })() : null,
     };
 
@@ -1221,7 +1231,7 @@ function detailHTML(c) {
   const watchH = c.watchNote ? `
     <div style="background:#F0F4F6;border:1px solid #889CA2;border-radius:10px;padding:11px 14px;margin-bottom:16px;">
       <div class="f-body" style="font-size:11px;font-weight:800;color:#889CA2;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:4px;">
-        👁 Day ${c.daysWatching}${launchStr?' · Launched '+launchStr:''}
+        👁 Day ${c.daysWatching + 1} of 3${launchStr?' · Launched '+launchStr:''}
       </div>
       <div class="f-body" style="font-size:13px;color:#2C3535;line-height:1.7;">${c.watchNote}</div>
     </div>` : '';
@@ -1303,7 +1313,7 @@ function rowHTML(c) {
         </div>
         <div class="camp-name f-body" style="font-size:13px;font-weight:700;color:#2C3535;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.name}</div>
         ${sa ? `<div class="f-body" style="font-size:12px;color:${isOff?'#E07070':'#6BAF8A'};font-weight:700;margin-top:3px;">${isOff?'⛔ ':''} ${sa}</div>` : ''}
-        ${c.isNew ? `<div class="f-body" style="font-size:12px;color:#889CA2;font-weight:600;margin-top:3px;">Day ${c.daysWatching} · ${c.sales>0?c.sales+' sales':'No sales yet'}</div>` : ''}
+        ${c.isNew ? `<div class="f-body" style="font-size:12px;color:#889CA2;font-weight:600;margin-top:3px;">Day ${c.daysWatching + 1} · ${c.sales>0?c.sales+' sales':'No sales yet'}</div>` : ''}
         <div class="camp-right-mobile" style="display:none;align-items:center;justify-content:space-between;margin-top:8px;">
           ${dualRoasHTML(mR, hR, 16)}
           <span class="chevron" id="chv-mob-${c.id}">⌄</span>
