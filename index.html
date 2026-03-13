@@ -253,6 +253,7 @@ let currentTab     = 'actions';
 let currentChart   = 'spend';
 let checked        = {};
 let trendChartInst = null;
+let allMetaRows    = []; // all raw Meta rows for chart spend (unfiltered)
 
 /* ── Formatters ──────────────────────────────────────────── */
 const fmtCurrency = v => (v == null || v === '') ? '—' : '$' + Number(v).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0});
