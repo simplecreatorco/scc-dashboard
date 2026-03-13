@@ -752,8 +752,15 @@ function generateFlagInsight(c) {
           : '';
         reasons.push(`7-day ROAS ${r.toFixed(2)} — below break-even (1.0) but above turn-off threshold (${TURN_OFF_THRESHOLD}). Losing money.${trendNote}`);
       } else {
-        // Below 0.75 but kept as orange due to yesterday signal
-        reasons.push(`7-day ROAS ${r.toFixed(2)} — below turn-off threshold, but yesterday showed recovery. Watch carefully before turning off.`);
+        // Below 0.75 — check if yesterday was actually higher or lower than 7-day
+        const rY = c.hyros.roasYest ?? c.meta.roasYest;
+        if (rY != null && rY > r) {
+          reasons.push(`7-day ROAS ${r.toFixed(2)} — below turn-off threshold. Yesterday (${rY.toFixed(2)}) was higher, suggesting a possible uptick. Watch 1–2 more days before turning off.`);
+        } else if (rY != null) {
+          reasons.push(`7-day ROAS ${r.toFixed(2)} — below turn-off threshold. Yesterday (${rY.toFixed(2)}) was not a recovery. Consider turning off.`);
+        } else {
+          reasons.push(`7-day ROAS ${r.toFixed(2)} — below turn-off threshold. Spending more than it returns. Consider turning off.`);
+        }
       }
     }
   }
@@ -852,17 +859,46 @@ function transformMetaRows(rows, hyrosYP, hyros7P, hyros30P, ladderMap) {
     const h7  = matchHyros(name, hyros7P)  || {};
     const h30 = matchHyros(name, hyros30P) || {};
 
+    // Compute per-campaign Hyros ROAS for 3-day and 14-day using daily sheet
+    // Method: each day, the campaign's share of account Hyros revenue =
+    //   (campaign daily Meta spend / total account Meta spend that day) × daily Hyros rev
+    function campHyrosWindow(nDays) {
+      const cutoff = daysAgo(nDays);
+      const today  = new Date(); today.setHours(0,0,0,0);
+      let campRev = 0, campSpend = 0;
+      for (const row of allMetaRows.slice(1)) {
+        const rd = parseDate(row[0]);
+        if (!rd || rd < cutoff || rd > today) continue;
+        const rowCamp = /\(CBO\)/i.test((row[1]||'').trim()) ? 'MTS CBO' : (row[1]||'').trim();
+        if (rowCamp !== name) continue;
+        const dayKey   = dateKey(rd);
+        // Total account Meta spend that day (all campaigns)
+        const totalDaySpend = allMetaRows.slice(1).reduce((sum, r2) => {
+          const d2 = parseDate(r2[0]);
+          return (d2 && dateKey(d2) === dayKey) ? sum + (parseFloat(r2[4])||0) : sum;
+        }, 0);
+        const dayHyrosRev = hyrosDailyMap[dayKey] ?? 0;
+        const cSpend = parseFloat(row[4]) || 0;
+        campSpend += cSpend;
+        campRev   += totalDaySpend > 0 ? (cSpend / totalDaySpend) * dayHyrosRev : 0;
+      }
+      if (campSpend === 0) return { roas: null, rev: null };
+      return { roas: parseFloat((campRev / campSpend).toFixed(4)), rev: Math.round(campRev) };
+    }
+    const hw3  = campHyrosWindow(3);
+    const hw14 = campHyrosWindow(14);
+
     const hyros = {
       roasYest: hY.roas  ?? null,
-      roas3:    null,
+      roas3:    hw3.roas,
       roas7:    h7.roas  ?? null,
-      roas14:   null,
+      roas14:   hw14.roas,
       roas30:   h30.roas ?? null,
       rev: {
         y:   Math.round(hY.rev  || 0) || null,
-        d3:  null,
+        d3:  hw3.rev,
         d7:  Math.round(h7.rev  || 0) || null,
-        d14: null,
+        d14: hw14.rev,
         d30: Math.round(h30.rev || 0) || null,
       },
       sales: {
@@ -1223,8 +1259,8 @@ function detailHTML(c) {
 /* ── Campaign row ────────────────────────────────────────── */
 function rowHTML(c) {
   const rk    = roasKeyFor(currentRange);
-  const mR    = c.isNew ? c.meta.roasYest  : c.meta[rk];
-  const hR    = c.isNew ? c.hyros.roasYest : c.hyros[rk];
+  const mR    = c.isNew ? c.meta.roas3  : c.meta[rk];
+  const hR    = c.isNew ? c.hyros.roas3 : c.hyros[rk];
   const isOff = c.status === 'turn_off';
   const isChk = !!checked[c.id];
   const sa    = getScaleAction(c);
@@ -1247,12 +1283,12 @@ function rowHTML(c) {
         ${sa ? `<div class="f-body" style="font-size:12px;color:${isOff?'#E07070':'#6BAF8A'};font-weight:700;margin-top:3px;">${isOff?'⛔ ':''} ${sa}</div>` : ''}
         ${c.isNew ? `<div class="f-body" style="font-size:12px;color:#889CA2;font-weight:600;margin-top:3px;">Day ${c.daysWatching} · ${c.sales>0?c.sales+' sales':'No sales yet'}</div>` : ''}
         <div class="camp-right-mobile" style="display:none;align-items:center;justify-content:space-between;margin-top:8px;">
-          ${dualRoasHTML(mR, hR, 14)}
+          ${dualRoasHTML(mR, hR, c.isNew ? 3 : 14)}
           <span class="chevron" id="chv-mob-${c.id}">⌄</span>
         </div>
       </div>
       <div class="camp-right" style="display:flex;align-items:center;gap:12px;flex-shrink:0;">
-        ${dualRoasHTML(mR, hR, 14)}
+        ${dualRoasHTML(mR, hR, c.isNew ? 3 : 14)}
         <span class="chevron" id="chv-${c.id}">⌄</span>
       </div>
     </div>
