@@ -673,6 +673,38 @@ function generateFlagInsight(c) {
   const reasons = [];
   const isOff = c.status === 'turn_off';
 
+  // ── Scale insights ────────────────────────────────────────
+  if (c.status === 'scale_vertical' || c.status === 'duplicate') {
+    const r = h7 ?? m7;
+    const rY = c.hyros.roasYest ?? mY;
+    const r14 = c.hyros.roas14 ?? m14;
+    if (r != null) reasons.push(`7-day ROAS ${r.toFixed(2)} — above scale threshold.`);
+    if (rY != null && rY >= 1.4) reasons.push(`Yesterday also strong at ${rY.toFixed(2)}.`);
+    if (r != null && r14 != null && r > r14) reasons.push(`Trending up from ${r14.toFixed(2)} (14-day).`);
+    if (c.meta.cpm != null && c.meta.cpm <= 20) reasons.push(`CPM $${c.meta.cpm.toFixed(2)} — healthy delivery.`);
+    if (!reasons.length) reasons.push('Performing above scale threshold. Ready to scale.');
+    return reasons.join(' ');
+  }
+
+  // ── Hold insights ─────────────────────────────────────────
+  if (c.status === 'hold') {
+    const r7  = h7  ?? m7;
+    const r14 = c.hyros.roas14 ?? m14;
+    const r30 = h30 ?? m30;
+    if (r7 != null && r14 != null) {
+      if (r7 >= r14) {
+        reasons.push(`7-day ROAS ${r7.toFixed(2)} — trending up from ${r14.toFixed(2)} (14-day). Holding steady, watch for scale threshold.`);
+      } else {
+        reasons.push(`7-day ROAS ${r7.toFixed(2)} — stable but below 14-day average of ${r14.toFixed(2)}. No action needed yet.`);
+      }
+    } else if (r7 != null) {
+      reasons.push(`7-day ROAS ${r7.toFixed(2)} — profitable. No action needed. Monitor for scale opportunity.`);
+    }
+    if (r30 != null && r7 != null && r7 >= r30 + 0.1) reasons.push(`Improving over 30-day average of ${r30.toFixed(2)}.`);
+    if (!reasons.length) reasons.push('Stable performance. No action needed — monitor for scaling opportunity.');
+    return reasons.join(' ');
+  }
+
   if (isOff) {
     if (h7!=null && h7<1.0) reasons.push(`Hyros 7-day ROAS ${h7.toFixed(2)} — below break-even.`);
     if (m7!=null && m7<1.0) reasons.push(`Meta 7-day ROAS ${m7.toFixed(2)} — below break-even.`);
@@ -943,7 +975,7 @@ function transformMetaRows(rows, hyrosYP, hyros7P, hyros30P, ladderMap) {
       })() : null,
     };
 
-    if (['orange_flag','turn_off'].includes(status)) {
+    if (['orange_flag','turn_off','hold','scale_vertical','duplicate'].includes(status)) {
       campaign.flag = { reason: generateFlagInsight(campaign) };
     }
 
@@ -1112,9 +1144,16 @@ function detailHTML(c) {
 
   // ── Flag / watch note ──
   const flagH = c.flag ? `
-    <div style="background:${c.status==='turn_off'?'#FCF0F0':'#FDF4E7'};border:1px solid ${c.status==='turn_off'?'#E07070':'#F4A24A'};border-radius:10px;padding:11px 14px;margin-bottom:16px;">
-      <div class="f-body" style="font-size:11px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:6px;color:${c.status==='turn_off'?'#E07070':'#F4A24A'};">
-        ${c.status==='turn_off'?'⛔ Recommended: Turn Off':'🚩 Orange Flag — Watch Closely'}
+    <div style="background:${c.status==='turn_off'?'#FCF0F0':c.status==='orange_flag'?'#FDF4E7':(c.status==='scale_vertical'||c.status==='duplicate')?'#EFF7F3':'#F0F4F6'};border:1px solid ${c.status==='turn_off'?'#E07070':c.status==='orange_flag'?'#F4A24A':(c.status==='scale_vertical'||c.status==='duplicate')?'#6BAF8A':'#C0CDD0'};border-radius:10px;padding:11px 14px;margin-bottom:16px;">
+      <div class="f-body" style="font-size:11px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:6px;color:${
+        c.status==='turn_off' ? '#E07070' :
+        c.status==='orange_flag' ? '#F4A24A' :
+        (c.status==='scale_vertical'||c.status==='duplicate') ? '#6BAF8A' : '#889CA2'
+      };">
+        ${c.status==='turn_off' ? '⛔ Recommended: Turn Off' :
+          c.status==='orange_flag' ? '🚩 Orange Flag — Watch Closely' :
+          (c.status==='scale_vertical'||c.status==='duplicate') ? '🚀 Ready to Scale' :
+          '📊 Hold — Stable'}
       </div>
       <div class="f-body" style="font-size:13px;color:#2C3535;line-height:1.7;">${c.flag.reason}</div>
     </div>` : '';
@@ -1244,9 +1283,10 @@ function getShown() {
   const flag = campaigns.filter(c=>c.status==='orange_flag');
   const nw   = campaigns.filter(c=>c.isNew);
 
-  // All Campaigns: hold/scale → orange → turn off → watching
+  // All Campaigns: hold → scale → orange flag → turn off → watching
   const allSorted = [
-    ...campaigns.filter(c=>['hold','scale_vertical','duplicate'].includes(c.status)),
+    ...campaigns.filter(c=>c.status==='hold'),
+    ...campaigns.filter(c=>['scale_vertical','duplicate'].includes(c.status)),
     ...campaigns.filter(c=>c.status==='orange_flag'),
     ...campaigns.filter(c=>c.status==='turn_off'),
     ...campaigns.filter(c=>c.status==='new_watch'),
