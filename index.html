@@ -1146,7 +1146,7 @@ function renderMiniChart(campId, rawRows) {
     dayPurchaseVal[dk] = (dayPurchaseVal[dk]||0) + pv;
   }
   var days = Object.keys(daySpend).sort();
-  if (days.length < 2) return;
+  if (days.length < 1) return;
   var labels = [], roasVals = [];
   for (var di = 0; di < days.length; di++) {
     var dk2 = days[di], sp2 = daySpend[dk2]||0, pv2 = dayPurchaseVal[dk2]||0;
@@ -1163,7 +1163,7 @@ function renderMiniChart(campId, rawRows) {
         {label:'Scale threshold', data:labels.map(function(){return 1.4;}), borderColor:'#F4A24A', borderWidth:1.5, borderDash:[4,4], pointRadius:0, fill:false},
         {label:'ROAS', data:roasVals, borderColor:'#F49C8E', borderWidth:2.5,
           pointRadius:4,
-          pointBackgroundColor: roasVals.map(function(v){return v>=1.4?'#6BAF8A':v>=1.0?'#F4A24A':'#E07B6A';}),
+          pointBackgroundColor: '#F49C8E',
           tension:0.3, fill:false}
       ]
     },
