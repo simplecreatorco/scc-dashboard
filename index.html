@@ -672,12 +672,28 @@ function generateFlagInsight(c) {
 
   // ── Scale insights ────────────────────────────────────────
   if (c.status === 'scale_vertical' || c.status === 'duplicate') {
-    const r = h7 ?? m7;
-    const rY = c.hyros.roasYest ?? mY;
+    // Show the signal(s) actually above threshold — don't show the weak one as the lead
+    const m7AboveScale  = m7  != null && m7  >= SCALE_THRESHOLD;
+    const h7AboveScale  = h7  != null && h7  >= SCALE_THRESHOLD;
+    const mYAboveScale  = mY  != null && mY  >= SCALE_THRESHOLD;
+    const hYAboveScale  = hY  != null && hY  >= SCALE_THRESHOLD;
+
+    if (m7AboveScale && h7AboveScale) {
+      reasons.push(`Meta 7-day ROAS ${m7.toFixed(2)} and Hyros 7-day ${h7.toFixed(2)} — both above scale threshold.`);
+    } else if (m7AboveScale) {
+      reasons.push(`Meta 7-day ROAS ${m7.toFixed(2)} — above scale threshold.${h7 != null ? ` (Hyros 7-day: ${h7.toFixed(2)})` : ''}`);
+    } else if (h7AboveScale) {
+      reasons.push(`Hyros 7-day ROAS ${h7.toFixed(2)} — above scale threshold.${m7 != null ? ` (Meta 7-day: ${m7.toFixed(2)})` : ''}`);
+    }
+    if (mYAboveScale || hYAboveScale) {
+      const yStr = mYAboveScale && hYAboveScale
+        ? `Meta ${mY.toFixed(2)} / Hyros ${hY.toFixed(2)}`
+        : mYAboveScale ? `Meta ${mY.toFixed(2)}` : `Hyros ${hY.toFixed(2)}`;
+      reasons.push(`Yesterday strong too: ${yStr}.`);
+    }
     const r14 = c.hyros.roas14 ?? m14;
-    if (r != null) reasons.push(`7-day ROAS ${r.toFixed(2)} — above scale threshold.`);
-    if (rY != null && rY >= 1.4) reasons.push(`Yesterday also strong at ${rY.toFixed(2)}.`);
-    if (r != null && r14 != null && r > r14) reasons.push(`Trending up from ${r14.toFixed(2)} (14-day).`);
+    const rLead = m7AboveScale ? m7 : h7;
+    if (rLead != null && r14 != null && rLead > r14) reasons.push(`Trending up from ${r14.toFixed(2)} (14-day).`);
     if (c.meta.cpm != null && c.meta.cpm <= 20) reasons.push(`CPM $${c.meta.cpm.toFixed(2)} — healthy delivery.`);
     if (!reasons.length) reasons.push('Performing above scale threshold. Ready to scale.');
     return reasons.join(' ');
