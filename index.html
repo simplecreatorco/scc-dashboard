@@ -294,7 +294,7 @@ function applyCalRange() {
     </div>
 
     <!-- SUMMARY ROW 1 -->
-    <div class="grid-3" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px;">
+    <div class="grid-3" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px;">
       <div style="background:white;border-radius:14px;padding:16px 18px;border:1.5px solid var(--teal);box-shadow:0 2px 8px rgba(0,0,0,0.04);">
         <div class="f-body" style="font-size:10px;font-weight:800;color:var(--mid);letter-spacing:0.07em;text-transform:uppercase;margin-bottom:4px;">Total Spend</div>
         <div class="f-recoleta" id="card-spend" class="summary-num" style="font-size:26px;font-weight:900;color:var(--dark);line-height:1.1;">—</div>
@@ -310,7 +310,7 @@ function applyCalRange() {
     </div>
 
     <!-- SUMMARY ROW 2 -->
-    <div class="grid-3" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:24px;">
+    <div class="grid-3" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:24px;">
       <div style="background:white;border-radius:14px;padding:14px 18px;border:1.5px solid var(--light);box-shadow:0 2px 8px rgba(0,0,0,0.04);display:flex;align-items:center;gap:14px;">
         <span style="font-size:24px;">📊</span>
         <div><div class="f-recoleta" id="count-active" class="summary-count" style="font-size:30px;font-weight:900;color:var(--dark);line-height:1;">—</div><div class="f-body" style="font-size:11px;font-weight:700;color:var(--mid);margin-top:2px;">Active Campaigns</div></div>
@@ -938,12 +938,24 @@ function transformMetaRows(rows, hyrosYP, hyros7P, hyros30P, ladderMap) {
     // Primary signal for status decisions — use REAL data sources only
     // hyros.roas3/roas14 are proportional estimates (display only) — never use for status
     // Real sources: Hyros yesterday sheet, Hyros 7-day sheet, Meta windows
-    const primary7 = hyros.roas7  ?? d7w.roas;  // primary scale signal
-    const primaryP = primary7;                    // status decisions based on 7-day
-    const primaryY = hyros.roasYest ?? yw.roas;
+    // 7-day signals — EITHER source can trigger scale
+    const meta7   = d7w.roas;
+    const hyros7  = hyros.roas7;
+    const metaY   = yw.roas;
+    const hyrosY  = hyros.roasYest;
 
-    // Is yesterday strong even if 3-day average is below threshold? (recovering from dip)
-    const recovering = primaryY != null && primaryY >= SCALE_THRESHOLD;
+    // Scale eligible: EITHER Meta 7-day OR Hyros 7-day >= threshold
+    const scale7  = (meta7  != null && meta7  >= SCALE_THRESHOLD)
+                 || (hyros7 != null && hyros7 >= SCALE_THRESHOLD);
+
+    // Yesterday dampener: BOTH signals below threshold → hold instead of scale
+    // If either yesterday signal is >= 1.4, still scale
+    const yestBothWeak = (metaY  == null || metaY  < SCALE_THRESHOLD)
+                      && (hyrosY == null || hyrosY < SCALE_THRESHOLD);
+
+    // Primary for hold/orange/turnoff decisions (fallback chain)
+    const primaryP = hyros7 ?? meta7;
+    const primaryY = hyrosY ?? metaY;
 
     // Sales count for turn-off-after-watch logic
     const totalSales = (d7w.purchases || 0);
@@ -960,14 +972,15 @@ function transformMetaRows(rows, hyrosYP, hyros7P, hyros30P, ladderMap) {
       status = 'turn_off';
     } else if (primaryP === null) {
       status = 'hold';
-    } else if (primaryP >= SCALE_THRESHOLD || (recovering && primaryP >= 1.0)) {
-      // Scale if 3-day ≥ 1.4, OR if yesterday ≥ 1.4 and 3-day ≥ 1.0 (recovering)
-      // D&D only if name has $50/$100 AND actual budget is still exactly $50 or $100.
-      // If actual budget has drifted (e.g. $139) = already D&D'd and vertically scaled — vertical only.
+    } else if (scale7 && !yestBothWeak) {
+      // 7-day is scale range AND at least one yesterday signal is strong → Scale
       const budgetRounded = Math.round(budget);
       const budgetIsStandard = (budgetRounded === 50 || budgetRounded === 100);
       const canDD = isDupDouble(name) && budgetIsStandard;
       status = canDD ? 'duplicate' : 'scale_vertical';
+    } else if (scale7 && yestBothWeak) {
+      // 7-day qualifies but both yesterday signals are soft → Hold for now
+      status = 'hold';
     } else if (primaryP >= ORANGE_THRESHOLD) {
       // 1.25–1.39: above orange flag range — hold, not flagged
       status = 'hold';
@@ -1237,12 +1250,13 @@ function detailHTML(c) {
   const wins = [
     {label:'Yesterday', mk:'roasYest', hk:'roasYest'},
     {label:'7-Day',     mk:'roas7',    hk:'roas7'},
-    {label:'14-Day',    mk:'roas14',   hk:'roas14'},
+    {label:'14-Day',    mk:'roas14',   hk:null},       // no Hyros 14-day sheet
+    {label:'30-Day',    mk:'roas30',   hk:'roas30'},
   ];
   const roasWinsH = `
     <div style="margin-bottom:16px;">
       <div class="f-body" style="font-size:11px;font-weight:800;color:#4A5858;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:10px;">ROAS by Window</div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
         ${wins.map(({label,mk,hk}) => {
           const mv=c.meta[mk], hv=c.hyros[hk];
           return `<div style="background:white;border-radius:10px;padding:12px 10px;border:1px solid #E8F0ED;text-align:center;">
@@ -1278,8 +1292,64 @@ function detailHTML(c) {
       </div>
     </div>`;
 
+
+  // ── Mini 7-day ROAS sparkline (Meta) ──
+  const miniChartH = (function() {
+    var today7 = new Date(); today7.setHours(0,0,0,0);
+    var cutoff7 = new Date(today7); cutoff7.setDate(cutoff7.getDate() - 7);
+    var daySpend = {}, dayRev = {};
+    for (var ri = 0; ri < (c._rawRows||[]).length; ri++) {
+      var row = c._rawRows[ri];
+      var rd = parseDate(row[0]);
+      if (!rd || rd < cutoff7 || rd > today7) continue;
+      var dk = dateKey(rd);
+      daySpend[dk] = (daySpend[dk]||0) + (parseFloat(row[4])||0);
+      dayRev[dk]   = (dayRev[dk]  ||0) + (parseFloat(row[13])||0);
+    }
+    var days = Object.keys(daySpend).sort();
+    if (days.length < 2) return '';
+    var points = [];
+    for (var di = 0; di < days.length; di++) {
+      var dk2 = days[di]; var sp = daySpend[dk2]; var rv = dayRev[dk2]||0;
+      if (sp > 0) points.push({ dk: dk2, roas: rv/sp });
+    }
+    if (points.length < 2) return '';
+    var vals = points.map(function(p){ return p.roas; });
+    var minV = Math.min.apply(null, vals.concat([0]));
+    var maxV = Math.max.apply(null, vals.concat([1.5]));
+    var range = maxV - minV || 1;
+    var W = 320, H = 56, pad = 8;
+    var xStep = (W - pad*2) / (points.length - 1);
+    var yScale = function(v){ return pad + (1-(v-minV)/range)*(H-pad*2); };
+    var pts = points.map(function(p,i){ return (pad+i*xStep)+','+yScale(p.roas); }).join(' ');
+    var yS14 = yScale(SCALE_THRESHOLD), yBE = yScale(1.0);
+    var dotsSVG = points.map(function(p,i){
+      var cx=pad+i*xStep, cy=yScale(p.roas);
+      var col = p.roas>=SCALE_THRESHOLD?'#6BAF8A': p.roas>=1.0?'#F4A24A':'#E07B6A';
+      return '<circle cx="'+cx+'" cy="'+cy+'" r="3" fill="'+col+'" stroke="white" stroke-width="1.5"/>';
+    }).join('');
+    var lblsSVG = points.map(function(p,i){
+      var d2=parseDate(p.dk);
+      var lbl=d2?d2.toLocaleString('en-US',{weekday:'short'}):'';
+      return '<text x="'+(pad+i*xStep)+'" y="'+(H+14)+'" text-anchor="middle" font-size="8" fill="#889CA2" font-family="Quicksand,sans-serif">'+lbl+'</text>';
+    }).join('');
+    return '<div style="margin-bottom:16px;">'
+      +'<div class="f-body" style="font-size:11px;font-weight:800;color:#4A5858;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:8px;">7-Day ROAS Trend (Meta)</div>'
+      +'<div style="background:white;border-radius:10px;border:1px solid #E8F0ED;padding:10px 12px;">'
+      +'<svg viewBox="0 0 '+W+' '+(H+20)+'" width="100%" style="display:block;overflow:visible;">'
+      +'<line x1="'+pad+'" y1="'+yBE+'" x2="'+(W-pad)+'" y2="'+yBE+'" stroke="#E8C5A0" stroke-width="1" stroke-dasharray="3,3"/>'
+      +'<line x1="'+pad+'" y1="'+yS14+'" x2="'+(W-pad)+'" y2="'+yS14+'" stroke="#B3DCDA" stroke-width="1" stroke-dasharray="3,3"/>'
+      +'<polyline points="'+pts+'" fill="none" stroke="#889CA2" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'
+      +dotsSVG+lblsSVG
+      +'</svg>'
+      +'<div style="display:flex;gap:12px;margin-top:4px;">'
+      +'<span class="f-body" style="font-size:9px;color:#6BAF8A;font-weight:700;">— Scale (1.4)</span>'
+      +'<span class="f-body" style="font-size:9px;color:#E8C5A0;font-weight:700;">— Break-even (1.0)</span>'
+      +'</div></div></div>';
+  })();
+
   return `<div class="camp-detail-inner" style="background:#FAF8F5;padding:18px 20px;border-top:1px solid #E8F0ED;">
-    ${flagH}${watchH}${roasWinsH}${metricsH}
+    ${flagH}${watchH}${miniChartH}${roasWinsH}${metricsH}
   </div>`;
 }
 
@@ -1346,14 +1416,15 @@ function getShown() {
   const flag = campaigns.filter(c=>c.status==='orange_flag');
   const nw   = campaigns.filter(c=>c.isNew);
 
-  // All Campaigns: hold → scale → orange flag → turn off → watching
-  const allSorted = [
-    ...campaigns.filter(c=>c.status==='hold'),
-    ...campaigns.filter(c=>['scale_vertical','duplicate'].includes(c.status)),
-    ...campaigns.filter(c=>c.status==='orange_flag'),
-    ...campaigns.filter(c=>c.status==='turn_off'),
-    ...campaigns.filter(c=>c.status==='new_watch'),
-  ];
+  // All Campaigns: newest to oldest by launch date / campaign ID
+  const allSorted = [...campaigns].sort((a, b) => {
+    // Use launchDate if available, else fall back to numeric ID (higher = newer)
+    const aTime = a.launchDate ? a.launchDate.getTime() : 0;
+    const bTime = b.launchDate ? b.launchDate.getTime() : 0;
+    if (aTime !== bTime) return bTime - aTime; // newer first
+    // Tie-break by numeric ID descending
+    return (parseInt(b.id,10)||0) - (parseInt(a.id,10)||0);
+  });
 
   return { actions:acts, flagged:flag, new:nw, all:allSorted }[currentTab] || allSorted;
 }
