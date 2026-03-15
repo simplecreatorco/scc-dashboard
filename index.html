@@ -1132,23 +1132,27 @@ function renderMiniChart(campId, rawRows) {
   if (!canvas) return;
   var today7 = new Date(); today7.setHours(0,0,0,0);
   var cutoff7 = new Date(today7); cutoff7.setDate(cutoff7.getDate() - 7);
-  var daySpend = {}, dayRev = {};
+  var daySpend = {}, dayPurchaseVal = {};
   for (var ri = 0; ri < (rawRows||[]).length; ri++) {
     var row = rawRows[ri];
     var rd = parseDate(row[0]);
     if (!rd || rd < cutoff7 || rd > today7) continue;
     var dk = dateKey(rd);
-    daySpend[dk] = (daySpend[dk]||0) + (parseFloat(row[4])||0);
-    dayRev[dk]   = (dayRev[dk]  ||0) + (parseFloat(row[13])||0);
+    var sp = parseFloat(row[4])||0;
+    // Col N (index 13) = "Purchases value (all)" — strip $ and commas before parsing
+    var pvRaw = (row[13]||'').toString().replace(/[$,]/g,'');
+    var pv = parseFloat(pvRaw)||0;
+    daySpend[dk]       = (daySpend[dk]      ||0) + sp;
+    dayPurchaseVal[dk] = (dayPurchaseVal[dk]||0) + pv;
   }
   var days = Object.keys(daySpend).sort();
   if (days.length < 2) return;
   var labels = [], roasVals = [];
   for (var di = 0; di < days.length; di++) {
-    var dk2 = days[di], sp = daySpend[dk2]||0, rv = dayRev[dk2]||0;
+    var dk2 = days[di], sp2 = daySpend[dk2]||0, pv2 = dayPurchaseVal[dk2]||0;
     var d2 = parseDate(dk2);
     labels.push(d2 ? d2.toLocaleString('en-US',{month:'short',day:'numeric'}) : dk2);
-    roasVals.push(sp > 0 ? parseFloat((rv/sp).toFixed(2)) : 0);
+    roasVals.push(sp2 > 0 ? parseFloat((pv2/sp2).toFixed(2)) : 0);
   }
   new Chart(canvas.getContext('2d'), {
     type: 'line',
@@ -1246,8 +1250,12 @@ function renderChart() {
             x: xScale,
             // Revenue axis: range starts at 0, top is maxRev — revenue plots in full range
             yRev: {...yScale, min:0, suggestedMax: maxRev * 1.15,
-              ticks:{...yScale.ticks, callback: v => `$${(v/1000).toFixed(0)}k`}},
-            // Spend axis: range starts at 0 but max is capped at maxSpend — spend plots lower
+              ticks:{...yScale.ticks, maxTicksLimit: 6, callback: v => {
+                if (v === 0) return '$0k';
+                if (v >= 1000) return '$' + (v/1000).toFixed(v % 1000 === 0 ? 0 : 1) + 'k';
+                return '$' + Math.round(v);
+              }}},
+            // Spend axis: same range so lines are comparable, but hidden
             ySpend: {...yScale, min:0, suggestedMax: maxRev * 1.15, display:false},
           }
       }
