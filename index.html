@@ -265,6 +265,16 @@ function rangeFor(which) {
   return { from: daysAgo(n), to: todayMid() };
 }
 
+function sameDay(a, b) { return !!a && !!b && a.getTime() === b.getTime(); }
+/* Which Hyros sheet (if any) covers this exact window */
+function windowKind(from, to) {
+  if (!sameDay(to, todayMid())) return null;
+  if (sameDay(from, daysAgo(1)))  return 'y';
+  if (sameDay(from, daysAgo(7)))  return 'd7';
+  if (sameDay(from, daysAgo(30))) return 'd30';
+  return null;
+}
+
 /* ── Number helpers ─────────────────────────────────────── */
 function num(v) {
   if (v === null || v === undefined || v === '') return 0;
@@ -499,13 +509,28 @@ function winFor(s, from, to) {
     var day = hyrosDailyMap[dk];
     if (day && day.rev > 0 && acct > 0) { hRev += (dm.spend / acct) * day.rev; if (dm.spend > 0) hAny = true; }
   }
+  /* Real per-ad-set Hyros beats the spend-share estimate whenever the window
+     lines up with one of the Hyros sheets. Without this, every offer gets
+     dragged to the ACCOUNT AVERAGE ROAS — which badly understates retargeting. */
+  var kind = windowKind(from, to);
+  var real = (kind && s.hyRaw) ? s.hyRaw[kind] : null;
+  var matched = false;
+  if (real && real.rev !== null && real.rev !== undefined) {
+    hRev = real.rev; hAny = true; matched = true;
+  }
+  var hRoas = null;
+  if (matched && real.roas !== null && real.roas !== undefined) hRoas = real.roas;
+  else if (hAny && spend > 0) hRoas = hRev / spend;
+
   return {
     spend: spend, purch: purch, val: val,
     freq: fn ? fq/fn : null,
     cpm: cn ? cpm/cn : null, cpc: cn ? cpc/cn : null, ctr: cn ? ctr/cn : null,
     metaRoas: spend > 0 ? val/spend : null,
     hyrosRev: hAny ? hRev : null,
-    hyrosRoas: (hAny && spend > 0) ? hRev/spend : null
+    hyrosRoas: hRoas,
+    hyrosSales: matched && real.sales !== null ? real.sales : null,
+    hyrosMatched: matched
   };
 }
 
@@ -513,26 +538,30 @@ function winFor(s, from, to) {
 function enrich(list) {
   for (var i = 0; i < list.length; i++) {
     var s = list[i];
+    /* Attach real Hyros matches first — winFor reads them */
+    s.hyRaw = {
+      y:   matchHyros(s.name, s.campaign, hyrosY),
+      d7:  matchHyros(s.name, s.campaign, hyros7),
+      d30: matchHyros(s.name, s.campaign, hyros30)
+    };
+    s.hyrosMatched = !!(s.hyRaw.d7 || s.hyRaw.d30 || s.hyRaw.y);
+
     s.y   = winFor(s, daysAgo(1),  todayMid());
     s.d7  = winFor(s, daysAgo(7),  todayMid());
     s.d14 = winFor(s, daysAgo(14), todayMid());
     s.d30 = winFor(s, daysAgo(30), todayMid());
 
-    // real Hyros from window sheets where available
-    var shY  = matchHyros(s.name, s.campaign, hyrosY);
-    var sh7  = matchHyros(s.name, s.campaign, hyros7);
-    var sh30 = matchHyros(s.name, s.campaign, hyros30);
     s.hy = {
-      yRoas:  shY  && shY.roas  !== null ? shY.roas  : s.y.hyrosRoas,
-      r7:     sh7  && sh7.roas  !== null ? sh7.roas  : s.d7.hyrosRoas,
+      yRoas:  s.y.hyrosRoas,
+      r7:     s.d7.hyrosRoas,
       r14:    s.d14.hyrosRoas,
-      r30:    sh30 && sh30.roas !== null ? sh30.roas : s.d30.hyrosRoas,
-      revY:   shY  && shY.rev   !== null ? shY.rev   : null,
-      rev7:   sh7  && sh7.rev   !== null ? sh7.rev   : s.d7.hyrosRev,
-      rev30:  sh30 && sh30.rev  !== null ? sh30.rev  : s.d30.hyrosRev,
-      sales7: sh7  && sh7.sales !== null ? sh7.sales : null,
-      sales30:sh30 && sh30.sales!== null ? sh30.sales: null,
-      salesY: shY  && shY.sales !== null ? shY.sales : null
+      r30:    s.d30.hyrosRoas,
+      revY:   s.y.hyrosRev,
+      rev7:   s.d7.hyrosRev,
+      rev30:  s.d30.hyrosRev,
+      salesY: s.y.hyrosSales,
+      sales7: s.d7.hyrosSales,
+      sales30:s.d30.hyrosSales
     };
 
     var m7 = s.d7.metaRoas, h7 = s.hy.r7, mY = s.y.metaRoas, hY = s.hy.yRoas;
@@ -627,6 +656,9 @@ function offerStats(offerKey, from, to) {
     spend += w.spend; metaVal += w.val;
     if (w.hyrosRev !== null) { hRev += w.hyrosRev; hAny = true; }
   }
+  var matchedSets = 0;
+  for (var mi = 0; mi < sets.length; mi++) if (sets[mi].hyrosMatched) matchedSets++;
+
   var pOffer = productOfferFor(offerKey);
   var pdata = computeProducts(pOffer, from, to);
 
@@ -641,7 +673,8 @@ function offerStats(offerKey, from, to) {
     aov: pdata.aov !== null ? pdata.aov : ((rev !== null && buyers) ? rev/buyers : null),
     cpb: (buyers && spend > 0) ? spend/buyers : null,
     products: pdata.products, mainUnits: pdata.mainUnits,
-    productSource: pdata.source
+    productSource: pdata.source,
+    matchedSets: matchedSets, totalSets: sets.length
   };
 }
 
@@ -733,25 +766,50 @@ function sortProducts(arr) {
 function dailySeries(sets, from, to) {
   var days = {};
   var yKey = dateKey(daysAgo(1));
+  var kind = windowKind(from, to);
+
   for (var i = 0; i < sets.length; i++) {
     var s = sets[i];
-    for (var dk in s.dayMap) {
-      if (!s.dayMap.hasOwnProperty(dk)) continue;
-      var d = parseDate(dk);
-      if (!d || d < from || d > to) continue;
-      if (!days[dk]) days[dk] = { spend:0, val:0, hRev:0 };
-      var dm = s.dayMap[dk];
-      days[dk].spend += dm.spend;
-      days[dk].val   += dm.val;
-      /* Yesterday has a REAL per-ad-set Hyros number from the yesterday sheet —
-         use it so the graph matches the ROAS-by-window card. Other days fall
-         back to a spend-share estimate of account revenue. */
-      if (dk === yKey && s.hy && s.hy.revY !== null && s.hy.revY !== undefined) {
-        days[dk].hRev += s.hy.revY;
-      } else {
-        var acct = s.acctDaySpend[dk] || 0;
-        var hd = hyrosDailyMap[dk];
-        if (hd && hd.rev > 0 && acct > 0) days[dk].hRev += (dm.spend / acct) * hd.rev;
+
+    /* Collect this ad set's days inside the window */
+    var myDays = [], mySpend = 0;
+    for (var dk0 in s.dayMap) {
+      if (!s.dayMap.hasOwnProperty(dk0)) continue;
+      var d0 = parseDate(dk0);
+      if (!d0 || d0 < from || d0 > to) continue;
+      myDays.push(dk0);
+      mySpend += s.dayMap[dk0].spend;
+      if (!days[dk0]) days[dk0] = { spend:0, val:0, hRev:0 };
+      days[dk0].spend += s.dayMap[dk0].spend;
+      days[dk0].val   += s.dayMap[dk0].val;
+    }
+    if (!myDays.length) continue;
+
+    /* Real Hyros total for this ad set + window, if the window matches a sheet */
+    var realTot = (kind && s.hyRaw && s.hyRaw[kind] && s.hyRaw[kind].rev !== null) ? s.hyRaw[kind].rev : null;
+    var realY = (s.hyRaw && s.hyRaw.y && s.hyRaw.y.rev !== null) ? s.hyRaw.y.rev : null;
+    var hasY = myDays.indexOf(yKey) !== -1;
+
+    if (realTot !== null) {
+      /* Spread the REAL total across this ad set's own days by its own spend
+         share, pinning yesterday to its real value. Sums exactly to the card. */
+      var pinY = (hasY && realY !== null) ? Math.min(realY, realTot) : null;
+      var rest = realTot - (pinY === null ? 0 : pinY);
+      var restSpend = mySpend - ((pinY === null) ? 0 : (s.dayMap[yKey] ? s.dayMap[yKey].spend : 0));
+      for (var m = 0; m < myDays.length; m++) {
+        var kk = myDays[m];
+        if (pinY !== null && kk === yKey) { days[kk].hRev += pinY; continue; }
+        var sp = s.dayMap[kk].spend;
+        days[kk].hRev += restSpend > 0 ? (sp / restSpend) * rest : (rest / myDays.length);
+      }
+    } else {
+      /* No Hyros match for this window — fall back to account spend-share */
+      for (var m2 = 0; m2 < myDays.length; m2++) {
+        var kk2 = myDays[m2];
+        if (kk2 === yKey && realY !== null) { days[kk2].hRev += realY; continue; }
+        var acct = s.acctDaySpend[kk2] || 0;
+        var hd = hyrosDailyMap[kk2];
+        if (hd && hd.rev > 0 && acct > 0) days[kk2].hRev += (s.dayMap[kk2].spend / acct) * hd.rev;
       }
     }
   }
@@ -1153,6 +1211,15 @@ function renderOffer() {
   }
   h += '</div></div>';
 
+  if (st.totalSets > 0 && st.matchedSets < st.totalSets) {
+    h += '<div class="alert-strip" style="background:#FDF4E7;color:#F4A24A;border:1px solid #F4A24A;">' +
+         '⚠️ Hyros matched ' + st.matchedSets + ' of ' + st.totalSets + ' ad sets here. Unmatched ones fall back to an estimate — ' +
+         'check that the Hyros report uses the same ad set names.</div>';
+  }
+  if (offerRange === 'custom') {
+    h += '<div class="alert-strip" style="background:#F0F4F6;color:#4A5858;border:1px solid #C0CDD0;">' +
+         'ℹ️ Custom ranges use estimated Hyros revenue. 7-day and 30-day use exact Hyros figures.</div>';
+  }
   var rangeCap = offerRange === 'd7' ? 'Last 7 days' : (offerRange === 'd30' ? 'Last 30 days' : 'Custom range');
   h += '<div class="grid-4" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;">';
   h += statCard('Ad Spend', fC(st.spend), rangeCap, '#2C3535', '#B3DCDA');
