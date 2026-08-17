@@ -650,10 +650,10 @@ function buildInsight(s) {
 function offerStats(offerKey, from, to) {
   var sets = [];
   for (var i = 0; i < ADSETS.length; i++) if (ADSETS[i].offer === offerKey) sets.push(ADSETS[i]);
-  var spend = 0, metaVal = 0, hRev = 0, hAny = false;
+  var spend = 0, metaVal = 0, metaPurch = 0, hRev = 0, hAny = false;
   for (var j = 0; j < sets.length; j++) {
     var w = winFor(sets[j], from, to);
-    spend += w.spend; metaVal += w.val;
+    spend += w.spend; metaVal += w.val; metaPurch += w.purch;
     if (w.hyrosRev !== null) { hRev += w.hyrosRev; hAny = true; }
   }
   var matchedSets = 0;
@@ -662,14 +662,20 @@ function offerStats(offerKey, from, to) {
   var pOffer = productOfferFor(offerKey);
   var pdata = computeProducts(pOffer, from, to);
 
-  var rev = hAny ? hRev : (metaVal > 0 ? metaVal : null);
-  var buyers = pdata.mainUnits > 0 ? pdata.mainUnits : null;
+  /* PRIMARY = Meta. Hyros last-touch under-credits retargeting, so the headline
+     numbers use Meta's attributed purchase value. Hyros is shown alongside. */
+  var rev = metaVal > 0 ? metaVal : null;
+  var hyrosRev = hAny ? hRev : null;
+  /* Buyers: real order count if we have purchase rows, else Meta purchases */
+  var buyers = pdata.mainUnits > 0 ? pdata.mainUnits : (metaPurch > 0 ? metaPurch : null);
   return {
     sets: sets, spend: spend, rev: rev,
     roas: (rev !== null && spend > 0) ? rev/spend : null,
     metaRoas: spend > 0 ? metaVal/spend : null,
+    metaPurch: metaPurch,
+    hyrosRev: hyrosRev,
+    hyrosRoas: (hyrosRev !== null && spend > 0) ? hyrosRev/spend : null,
     profit: rev !== null ? rev - spend : null,
-    /* AOV from real order revenue when we have purchase rows, else attributed rev */
     aov: pdata.aov !== null ? pdata.aov : ((rev !== null && buyers) ? rev/buyers : null),
     cpb: (buyers && spend > 0) ? spend/buyers : null,
     products: pdata.products, mainUnits: pdata.mainUnits,
@@ -814,12 +820,13 @@ function dailySeries(sets, from, to) {
     }
   }
   var keys = Object.keys(days).sort();
-  var out = { labels: [], spend: [], hRev: [], metaRoas: [], hyrosRoas: [] };
+  var out = { labels: [], spend: [], hRev: [], metaRev: [], metaRoas: [], hyrosRoas: [] };
   for (var k = 0; k < keys.length; k++) {
     var kk = keys[k], v = days[kk], dd = parseDate(kk);
     out.labels.push(dd ? dd.toLocaleString('en-US', { month:'short', day:'numeric' }) : kk);
     out.spend.push(Math.round(v.spend));
     out.hRev.push(Math.round(v.hRev));
+    out.metaRev.push(Math.round(v.val));
     out.metaRoas.push(v.spend > 0 ? +(v.val / v.spend).toFixed(2) : 0);
     out.hyrosRoas.push(v.spend > 0 ? +(v.hRev / v.spend).toFixed(2) : 0);
   }
@@ -841,7 +848,8 @@ function drawLineChart(canvasId, series, mode, refKey) {
     ];
   } else {
     ds = [
-      { label:'Hyros Revenue', data: series.hRev, borderColor:'#6BAF8A', borderWidth:2.5, pointRadius:3, pointBackgroundColor:'#6BAF8A', tension:.3, fill:false },
+      { label:'Meta Revenue', data: series.metaRev, borderColor:'#6BAF8A', borderWidth:2.5, pointRadius:3, pointBackgroundColor:'#6BAF8A', tension:.3, fill:false },
+      { label:'Hyros Revenue', data: series.hRev, borderColor:'#F3B548', borderWidth:2.5, pointRadius:3, pointBackgroundColor:'#F3B548', tension:.3, fill:false },
       { label:'Ad Spend', data: series.spend, borderColor:'#889CA2', borderWidth:2.5, pointRadius:3, pointBackgroundColor:'#889CA2', tension:.3, fill:false }
     ];
   }
@@ -1022,6 +1030,7 @@ function detailHTML(s) {
   // metrics
   var mets = [
     ['Spend', fC(w.spend)],
+    ['Meta Revenue', fC(w.val > 0 ? w.val : null)],
     ['Hyros Revenue', fC(w.hyrosRev)],
     ['Meta Purchases', String(Math.round(w.purch))],
     ['CPM', fD(w.cpm)],
@@ -1089,13 +1098,15 @@ function renderMain() {
   var shown = groups[TAB] || gAll;
 
   // account totals
-  var totSpend = 0, totRev = 0;
+  var totSpend = 0, totHyros = 0, totMeta = 0;
   for (var q = 0; q < ADSETS.length; q++) {
     var w = winFor(ADSETS[q], b.from, b.to);
     totSpend += w.spend;
-    if (w.hyrosRev !== null) totRev += w.hyrosRev;
+    totMeta += w.val;
+    if (w.hyrosRev !== null) totHyros += w.hyrosRev;
   }
-  var totRoas = totSpend > 0 && totRev > 0 ? totRev/totSpend : null;
+  var totRoas = totSpend > 0 && totMeta > 0 ? totMeta/totSpend : null;
+  var totHyrosRoas = totSpend > 0 && totHyros > 0 ? totHyros/totSpend : null;
 
   var h = '';
 
@@ -1133,8 +1144,8 @@ function renderMain() {
   // summary cards
   h += '<div class="grid-3" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px;">';
   h += statCard('Total Spend', fC(totSpend), null, '#2C3535', '#B3DCDA');
-  h += statCard('Hyros Revenue', fC(totRev > 0 ? totRev : null), null, '#2C3535', '#BFD9CC');
-  h += statCard('Hyros ROAS', fR(totRoas), null, roasColor(totRoas), roasColor(totRoas));
+  h += statCard('Revenue', fC(totMeta > 0 ? totMeta : null), 'Meta' + (totHyros > 0 ? ' · Hyros ' + fC(totHyros) : ''), '#2C3535', '#BFD9CC');
+  h += statCard('ROAS', fR(totRoas), 'Meta' + (totHyrosRoas !== null ? ' · Hyros ' + fR(totHyrosRoas) + 'x' : ''), roasColor(totRoas), roasColor(totRoas));
   h += '</div>';
 
   h += '<div class="grid-3" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:22px;">';
@@ -1150,13 +1161,13 @@ function renderMain() {
   for (var o = 0; o < OFFERS.length; o++) {
     var od2 = OFFERS[o];
     var os = offerStats(od2.key, b.from, b.to);
-    var showRoas = os.roas !== null ? os.roas : os.metaRoas;
+    var showRoas = os.metaRoas !== null ? os.metaRoas : os.roas;
     h += '<div class="offer-card" data-act="offer" data-v="' + encodeURIComponent(od2.key) + '">';
     h += '<div class="f-body" style="font-size:10px;font-weight:800;color:' + (od2.rt ? '#889CA2' : '#F49C8E') +
          ';letter-spacing:.07em;text-transform:uppercase;line-height:1.35;min-height:26px;">' +
          (od2.rt ? '🔁 ' : '') + od2.label + '</div>';
     h += '<div class="f-recoleta" style="font-size:28px;font-weight:900;line-height:1.1;margin:6px 0 2px;color:' + roasColor(showRoas) + ';">' + fR(showRoas) + '</div>';
-    h += '<div class="f-body" style="font-size:11px;color:#4A5858;">ROAS · ' + fC(os.spend) + ' spend</div>';
+    h += '<div class="f-body" style="font-size:11px;color:#4A5858;">Meta ROAS · ' + fC(os.spend) + ' spend</div>';
     h += '<div class="f-body" style="font-size:11px;color:#889CA2;margin-top:2px;">' + os.sets.length + ' ad set' + (os.sets.length === 1 ? '' : 's') + ' →</div>';
     h += '</div>';
   }
@@ -1223,9 +1234,10 @@ function renderOffer() {
   var rangeCap = offerRange === 'd7' ? 'Last 7 days' : (offerRange === 'd30' ? 'Last 30 days' : 'Custom range');
   h += '<div class="grid-4" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;">';
   h += statCard('Ad Spend', fC(st.spend), rangeCap, '#2C3535', '#B3DCDA');
-  h += statCard('Revenue', fC(st.rev), 'Hyros attributed', '#2C3535', '#BFD9CC');
-  h += statCard('ROAS', st.roas !== null ? fR(st.roas) + 'x' : '—', st.roas !== null ? (st.roas >= 1 ? 'Above break-even' : 'Below break-even') : '', roasColor(st.roas), roasColor(st.roas));
-  h += statCard('Profit', fC(st.profit), 'Revenue − Spend', st.profit !== null ? (st.profit >= 0 ? '#6BAF8A' : '#E07070') : '#2C3535', '#E8F0ED');
+  h += statCard('Revenue', fC(st.rev), 'Meta attributed' + (st.hyrosRev !== null ? ' · Hyros ' + fC(st.hyrosRev) : ''), '#2C3535', '#BFD9CC');
+  h += statCard('ROAS', st.roas !== null ? fR(st.roas) + 'x' : '—',
+       'Meta' + (st.hyrosRoas !== null ? ' · Hyros ' + fR(st.hyrosRoas) + 'x' : ''), roasColor(st.roas), roasColor(st.roas));
+  h += statCard('Profit', fC(st.profit), 'Meta revenue − spend', st.profit !== null ? (st.profit >= 0 ? '#6BAF8A' : '#E07070') : '#2C3535', '#E8F0ED');
   h += '</div>';
 
   h += '<div class="offer-lower" style="display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:22px;">';
