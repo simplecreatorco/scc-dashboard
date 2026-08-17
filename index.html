@@ -128,20 +128,78 @@ var PRUNE_WATCH_SPEND = 150;   // $150+ spend, ROAS < 0.5
 var CREATIVE_AGE_DAYS = 21;    // 3-week refresh nudge
 var RT_FREQ_ALERT = 3.5;
 
-var OFFERS = [
+/* Offers are built at load time. Product offers are fixed; every retargeting
+   CAMPAIGN becomes its own offer so each RT effort is judged separately. */
+var OFFERS = [];
+var FIXED_OFFERS = [
   { key:'MTS',  label:'Made to Sell' },
   { key:'IPSS', label:'IPSS' },
-  { key:'SOR',  label:'Sell on Repeat' },
-  { key:'RT',   label:'Retargeting' }
+  { key:'SOR',  label:'Sell on Repeat' }
 ];
 
-function offerFor(text) {
-  var t = text || '';
-  if (/\bRT\b|retarget|coupon\s*-\s*warm|warm\s*rt/i.test(t)) return 'RT';
-  if (/IPSS|instagram passive/i.test(t)) return 'IPSS';
-  if (/\bSOR\b|sell on repeat/i.test(t)) return 'SOR';
-  if (/\bMTS\b|made to sell/i.test(t)) return 'MTS';
+/* Product classification for the Purchases tab.
+   Edit these patterns if product names change in SamCart/Hyros. */
+var PRODUCT_MAP = [
+  { re:/made to sell|(^|\W)mts(\W|$)/i,        offer:'MTS',  role:'main'   },
+  { re:/launch[- ]?ready|launch toolkit/i,      offer:'MTS',  role:'bump'   },
+  { re:/hook bank/i,                            offer:'MTS',  role:'upsell' },
+  { re:/bot bundle|ai bot/i,                    offer:'MTS',  role:'upsell' },
+  { re:/instagram passive|(^|\W)ipss(\W|$)/i,  offer:'IPSS', role:'main'   },
+  { re:/brand detective/i,                      offer:'IPSS', role:'upsell' },
+  { re:/sell on repeat|(^|\W)sor(\W|$)/i,      offer:'SOR',  role:'main'   }
+];
+function classifyProduct(name) {
+  for (var i = 0; i < PRODUCT_MAP.length; i++) {
+    if (PRODUCT_MAP[i].re.test(name || '')) return PRODUCT_MAP[i];
+  }
+  return null;
+}
+
+function isRetargetingText(t) {
+  return /\bRT\b|retarget|warm\s*rt|coupon\s*-\s*warm/i.test(t || '');
+}
+function isRTOffer(key) { return String(key || '').indexOf('RT::') === 0; }
+function rtLabel(key) { return String(key).slice(4); }
+
+/* Retargeting keys off the CAMPAIGN so MTS RT, PAA RT, IPSS RT stay separate */
+function offerKeyFor(camp, adset) {
+  var combo = (camp || '') + ' ' + (adset || '');
+  if (isRetargetingText(combo)) return 'RT::' + String(camp || 'Retargeting').trim();
+  if (/IPSS|instagram passive/i.test(combo)) return 'IPSS';
+  if (/\bSOR\b|sell on repeat/i.test(combo)) return 'SOR';
+  if (/\bMTS\b|made to sell/i.test(combo)) return 'MTS';
   return 'OTHER';
+}
+function offerFor(text) { return offerKeyFor(text, ''); }
+
+function buildOffers() {
+  var out = [];
+  for (var f = 0; f < FIXED_OFFERS.length; f++) {
+    for (var i = 0; i < ADSETS.length; i++) {
+      if (ADSETS[i].offer === FIXED_OFFERS[f].key) { out.push(FIXED_OFFERS[f]); break; }
+    }
+  }
+  var rtSpend = {};
+  for (var j = 0; j < ADSETS.length; j++) {
+    var s = ADSETS[j];
+    if (!isRTOffer(s.offer)) continue;
+    rtSpend[s.offer] = (rtSpend[s.offer] || 0) + s.d7.spend;
+  }
+  var keys = Object.keys(rtSpend).sort(function (a, b) { return rtSpend[b] - rtSpend[a]; });
+  for (var k = 0; k < keys.length; k++) out.push({ key: keys[k], label: rtLabel(keys[k]), rt: true });
+  return out;
+}
+function offerDef(key) {
+  for (var i = 0; i < OFFERS.length; i++) if (OFFERS[i].key === key) return OFFERS[i];
+  return null;
+}
+/* Which product offer does an RT campaign sell? Used for product panel. */
+function productOfferFor(offerKey) {
+  if (!isRTOffer(offerKey)) return offerKey;
+  var camp = rtLabel(offerKey);
+  if (/IPSS/i.test(camp)) return 'IPSS';
+  if (/\bSOR\b|sell on repeat/i.test(camp)) return 'SOR';
+  return 'MTS';
 }
 function isTrafficOnly(text) {
   return /ig followers|pinned|manychat|\(ID:\s*W\d+\)|engagement/i.test(text || '');
@@ -149,7 +207,7 @@ function isTrafficOnly(text) {
 
 /* ── State ──────────────────────────────────────────────── */
 var metaRows = [], hyrosY = null, hyros7 = null, hyros30 = null;
-var hyrosDailyMap = {}, productRows = [];
+var hyrosDailyMap = {}, productRows = [], purchaseRows = [];
 var ADSETS = [];
 var PAGE = 'main', CUR_OFFER = null;
 var TAB = 'actions';
@@ -314,6 +372,22 @@ function parseProducts(rows) {
   return out;
 }
 
+/* ── Parse raw Purchases tab ────────────────────────────── */
+/* cols: A=Date B=Order ID C=Product D=Amount */
+function parsePurchases(rows) {
+  var out = [];
+  if (!rows || rows.length < 2) return out;
+  for (var i = 1; i < rows.length; i++) {
+    var row = rows[i];
+    var d = parseDate(row[0]);
+    if (!d) continue;
+    var prod = String(row[2] || '').trim();
+    if (!prod) continue;
+    out.push({ dateObj: d, orderId: String(row[1] || '').trim(), product: prod, amount: num(row[3]) });
+  }
+  return out;
+}
+
 /* ── Build ad sets from Meta rows ───────────────────────── */
 function buildAdsets() {
   var byKey = {};
@@ -371,7 +445,7 @@ function buildAdsets() {
     }
 
     var traffic = isTrafficOnly(combo);
-    var offer = offerFor(combo);
+    var offer = offerKeyFor(camp2, name);
 
     var daysLive = firstSeen ? Math.floor((todayMid() - firstSeen) / 86400000) : 99;
     var isNew = daysLive < 3;
@@ -453,6 +527,7 @@ function enrich(list) {
       r7:     sh7  && sh7.roas  !== null ? sh7.roas  : s.d7.hyrosRoas,
       r14:    s.d14.hyrosRoas,
       r30:    sh30 && sh30.roas !== null ? sh30.roas : s.d30.hyrosRoas,
+      revY:   shY  && shY.rev   !== null ? shY.rev   : null,
       rev7:   sh7  && sh7.rev   !== null ? sh7.rev   : s.d7.hyrosRev,
       rev30:  sh30 && sh30.rev  !== null ? sh30.rev  : s.d30.hyrosRev,
       sales7: sh7  && sh7.sales !== null ? sh7.sales : null,
@@ -467,10 +542,17 @@ function enrich(list) {
     var sales7 = s.d7.purch + (s.hy.sales7 || 0);
 
     var status;
+    var isRT = isRTOffer(s.offer);
     if (s.traffic) {
       status = 'traffic';
     } else if (s.isNew) {
       status = 'new_watch';
+    } else if (isRT) {
+      /* Retargeting is never turned off — it either scales up or scales back. */
+      if (primary === null) status = 'hold';
+      else if (scale7 && !yestBothWeak) status = 'scale';
+      else if (primary < 1.0) status = 'scale_back';
+      else status = 'hold';
     } else if (sales7 === 0 && s.daysLive >= 3) {
       status = 'turn_off';
     } else if (primary === null) {
@@ -508,6 +590,10 @@ function buildInsight(s) {
       parts.push('Yesterday strong too: ' + (mY !== null ? 'Meta ' + fR(mY) : '') + (hY !== null ? ' / Hyros ' + fR(hY) : '') + '.');
     }
     if (s.d7.cpm !== null && s.d7.cpm <= 20) parts.push('CPM ' + fD(s.d7.cpm) + ' — healthy delivery.');
+  } else if (s.status === 'scale_back') {
+    var pb = (h7 !== null) ? h7 : m7;
+    parts.push('7-day ROAS ' + fR(pb) + ' — below break-even. Retargeting never gets turned off; trim the budget and let the pool recover.');
+    if (s.d7.freq !== null && s.d7.freq >= RT_FREQ_ALERT) parts.push('Frequency ' + s.d7.freq.toFixed(1) + 'x — audience is saturated.');
   } else if (s.status === 'turn_off') {
     if ((s.d7.purch + (s.hy.sales7||0)) === 0) parts.push('No sales in 7 days on ' + fC(s.d7.spend) + ' spend. Turn it off.');
     else parts.push('Meta ' + fR(m7) + ' and Hyros ' + fR(h7) + ' both below turn-off threshold (' + OFF_T + ').');
@@ -541,44 +627,112 @@ function offerStats(offerKey, from, to) {
     spend += w.spend; metaVal += w.val;
     if (w.hyrosRev !== null) { hRev += w.hyrosRev; hAny = true; }
   }
-  var prodMap = {}, mainUnits = 0, prodRev = 0;
-  for (var p = 0; p < productRows.length; p++) {
-    var pr = productRows[p];
-    if (pr.offer !== offerKey) continue;
-    var pd = parseDate(pr.date);
-    if (!pd || pd < from || pd > to) continue;
-    var pk = pr.role + '|' + pr.product;
-    if (!prodMap[pk]) prodMap[pk] = { product: pr.product, role: pr.role, units: 0, rev: 0 };
-    prodMap[pk].units += pr.units;
-    prodMap[pk].rev += pr.rev;
-    prodRev += pr.rev;
-    if (pr.role === 'main') mainUnits += pr.units;
-  }
-  var products = [];
-  for (var pk2 in prodMap) if (prodMap.hasOwnProperty(pk2)) products.push(prodMap[pk2]);
-  products.sort(function (a, b) {
-    var ord = { main:0, bump:1, upsell:2 };
-    var oa = ord[a.role] === undefined ? 3 : ord[a.role];
-    var ob = ord[b.role] === undefined ? 3 : ord[b.role];
-    return oa - ob || b.units - a.units;
-  });
+  var pOffer = productOfferFor(offerKey);
+  var pdata = computeProducts(pOffer, from, to);
 
   var rev = hAny ? hRev : (metaVal > 0 ? metaVal : null);
-  var buyers = mainUnits > 0 ? mainUnits : null;
+  var buyers = pdata.mainUnits > 0 ? pdata.mainUnits : null;
   return {
     sets: sets, spend: spend, rev: rev,
     roas: (rev !== null && spend > 0) ? rev/spend : null,
     metaRoas: spend > 0 ? metaVal/spend : null,
     profit: rev !== null ? rev - spend : null,
-    aov: (rev !== null && buyers) ? rev/buyers : null,
+    /* AOV from real order revenue when we have purchase rows, else attributed rev */
+    aov: pdata.aov !== null ? pdata.aov : ((rev !== null && buyers) ? rev/buyers : null),
     cpb: (buyers && spend > 0) ? spend/buyers : null,
-    products: products, mainUnits: mainUnits
+    products: pdata.products, mainUnits: pdata.mainUnits,
+    productSource: pdata.source
   };
+}
+
+/* Product / bump / upsell conversion.
+   Preferred source: raw Purchases tab (Date, Order ID, Product, Amount).
+   Conversion = orders containing that product / orders containing the main offer.
+   Falls back to a pre-aggregated Hyros Products tab if that's what exists. */
+function computeProducts(offerKey, from, to) {
+  var empty = { products: [], mainUnits: 0, aov: null, source: 'none' };
+  if (offerKey === 'OTHER') return empty;
+
+  if (purchaseRows.length) {
+    var orders = {};
+    for (var i = 0; i < purchaseRows.length; i++) {
+      var r = purchaseRows[i];
+      if (!r.dateObj || r.dateObj < from || r.dateObj > to) continue;
+      var oid = r.orderId || ('row' + i);
+      if (!orders[oid]) orders[oid] = { items: [], total: 0 };
+      orders[oid].items.push(r);
+      orders[oid].total += r.amount;
+    }
+    var mainOrders = 0, mainRev = 0, counts = {}, labels = {};
+    for (var oid2 in orders) {
+      if (!orders.hasOwnProperty(oid2)) continue;
+      var o = orders[oid2];
+      var hasMain = false;
+      for (var it = 0; it < o.items.length; it++) {
+        var cls = classifyProduct(o.items[it].product);
+        if (cls && cls.offer === offerKey && cls.role === 'main') { hasMain = true; break; }
+      }
+      if (!hasMain) continue;
+      mainOrders++;
+      mainRev += o.total;
+      var seen = {};
+      for (var it2 = 0; it2 < o.items.length; it2++) {
+        var item = o.items[it2];
+        var c2 = classifyProduct(item.product);
+        if (!c2 || c2.offer !== offerKey) continue;
+        var key = c2.role + '|' + item.product;
+        if (seen[key]) continue;
+        seen[key] = true;
+        counts[key] = (counts[key] || 0) + 1;
+        labels[key] = { product: item.product, role: c2.role };
+      }
+    }
+    if (!mainOrders) return empty;
+    var list = [];
+    for (var k in counts) {
+      if (!counts.hasOwnProperty(k)) continue;
+      list.push({ product: labels[k].product, role: labels[k].role, units: counts[k], rev: 0 });
+    }
+    sortProducts(list);
+    return { products: list, mainUnits: mainOrders, aov: mainRev / mainOrders, source: 'purchases' };
+  }
+
+  if (productRows.length) {
+    var pm = {}, mu = 0;
+    for (var p = 0; p < productRows.length; p++) {
+      var pr = productRows[p];
+      if (pr.offer !== offerKey) continue;
+      var pd2 = parseDate(pr.date);
+      if (!pd2 || pd2 < from || pd2 > to) continue;
+      var pk = pr.role + '|' + pr.product;
+      if (!pm[pk]) pm[pk] = { product: pr.product, role: pr.role, units: 0, rev: 0 };
+      pm[pk].units += pr.units;
+      pm[pk].rev += pr.rev;
+      if (pr.role === 'main') mu += pr.units;
+    }
+    var arr = [];
+    for (var pk2 in pm) if (pm.hasOwnProperty(pk2)) arr.push(pm[pk2]);
+    if (!arr.length) return empty;
+    sortProducts(arr);
+    var totRev = 0;
+    for (var a2 = 0; a2 < arr.length; a2++) totRev += arr[a2].rev;
+    return { products: arr, mainUnits: mu, aov: mu > 0 ? totRev / mu : null, source: 'aggregated' };
+  }
+  return empty;
+}
+function sortProducts(arr) {
+  arr.sort(function (a, b) {
+    var ord = { main:0, bump:1, upsell:2 };
+    var oa = ord[a.role] === undefined ? 3 : ord[a.role];
+    var ob = ord[b.role] === undefined ? 3 : ord[b.role];
+    return oa - ob || b.units - a.units;
+  });
 }
 
 /* ── Chart data ─────────────────────────────────────────── */
 function dailySeries(sets, from, to) {
   var days = {};
+  var yKey = dateKey(daysAgo(1));
   for (var i = 0; i < sets.length; i++) {
     var s = sets[i];
     for (var dk in s.dayMap) {
@@ -589,9 +743,16 @@ function dailySeries(sets, from, to) {
       var dm = s.dayMap[dk];
       days[dk].spend += dm.spend;
       days[dk].val   += dm.val;
-      var acct = s.acctDaySpend[dk] || 0;
-      var hd = hyrosDailyMap[dk];
-      if (hd && hd.rev > 0 && acct > 0) days[dk].hRev += (dm.spend / acct) * hd.rev;
+      /* Yesterday has a REAL per-ad-set Hyros number from the yesterday sheet —
+         use it so the graph matches the ROAS-by-window card. Other days fall
+         back to a spend-share estimate of account revenue. */
+      if (dk === yKey && s.hy && s.hy.revY !== null && s.hy.revY !== undefined) {
+        days[dk].hRev += s.hy.revY;
+      } else {
+        var acct = s.acctDaySpend[dk] || 0;
+        var hd = hyrosDailyMap[dk];
+        if (hd && hd.rev > 0 && acct > 0) days[dk].hRev += (dm.spend / acct) * hd.rev;
+      }
     }
   }
   var keys = Object.keys(days).sort();
@@ -632,11 +793,21 @@ function drawLineChart(canvasId, series, mode, refKey) {
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: {
-        legend: { display: true, labels: { filter: function (it) { return it.text !== 'Break even' && it.text !== 'Scale (1.4)'; },
-          font: { family:'Nunito', size:11 }, boxWidth:14, color:'#4A5858' } },
+        legend: { display: true, labels: {
+          filter: function (it) { return it.text !== 'Break even' && it.text !== 'Scale (1.4)'; },
+          usePointStyle: true, pointStyle: 'circle', boxWidth: 8, boxHeight: 8,
+          font: { family:'Nunito', size:11 }, color:'#4A5858', padding:14 } },
         tooltip: { backgroundColor:'#fff', titleColor:'#4A5858', bodyColor:'#2C3535',
           borderColor:'#E8F0ED', borderWidth:1, padding:9, mode:'index', intersect:false,
-          titleFont:{family:'Nunito',size:11,weight:'800'}, bodyFont:{family:'Nunito',size:12,weight:'700'} }
+          usePointStyle: true, boxPadding: 4,
+          titleFont:{family:'Nunito',size:11,weight:'800'}, bodyFont:{family:'Nunito',size:12,weight:'700'},
+          /* only the real data lines — never the break-even / scale guides */
+          filter: function (it) { return it.dataset.label !== 'Break even' && it.dataset.label !== 'Scale (1.4)'; },
+          callbacks: { label: function (ctx) {
+            var v = ctx.parsed.y;
+            if (isRoas) return ' ' + ctx.dataset.label + ': ' + Number(v).toFixed(2) + 'x';
+            return ' ' + ctx.dataset.label + ': $' + Math.round(v).toLocaleString('en-US');
+          } } }
       },
       scales: {
         x: { grid:{display:false}, border:{display:false}, ticks:{ font:{family:'Nunito',size:10}, color:'#4A5858' } },
@@ -657,6 +828,7 @@ function drawLineChart(canvasId, series, mode, refKey) {
 function badgeHTML(status) {
   var M = {
     scale:     ['Scale 9%',  '#EFF7F3', '#6BAF8A'],
+    scale_back:['Scale Back','#FDF4E7', '#E07070'],
     orange:    ['Orange Flag','#FDF4E7','#F4A24A'],
     turn_off:  ['Turn Off',  '#FCF0F0', '#E07070'],
     new_watch: ['Watching',  '#F0F4F6', '#889CA2'],
@@ -668,7 +840,7 @@ function badgeHTML(status) {
     'letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;background:' + s[1] + ';color:' + s[2] + ';border:1px solid ' + s[2] + ';">' + s[0] + '</span>';
 }
 function borderFor(status) {
-  var M = { scale:'#6BAF8A', orange:'#F4A24A', turn_off:'#E07070', new_watch:'#889CA2', traffic:'#E8F0ED' };
+  var M = { scale:'#6BAF8A', scale_back:'#E07070', orange:'#F4A24A', turn_off:'#E07070', new_watch:'#889CA2', traffic:'#E8F0ED' };
   return M[status] || '#E8F0ED';
 }
 function dualRoasHTML(m, h) {
@@ -692,10 +864,17 @@ function statCard(label, value, caption, color, borderCol) {
 }
 
 function scaleActionHTML(s) {
-  if (s.status !== 'scale') return '';
-  if (!s.budget) return '<div class="f-body" style="font-size:12px;color:#6BAF8A;font-weight:700;margin-top:3px;">Scale 9% — set budget in Meta</div>';
-  var nb = Math.round(s.budget * 1.09);
-  return '<div class="f-body" style="font-size:12px;color:#6BAF8A;font-weight:700;margin-top:3px;">$' + s.budget + ' → $' + nb + '/day (+9%)</div>';
+  if (s.status === 'scale') {
+    if (!s.budget) return '<div class="f-body" style="font-size:12px;color:#6BAF8A;font-weight:700;margin-top:3px;">Scale 9% — set budget in Meta</div>';
+    var nb = Math.round(s.budget * 1.09);
+    return '<div class="f-body" style="font-size:12px;color:#6BAF8A;font-weight:700;margin-top:3px;">$' + s.budget + ' → $' + nb + '/day (+9%)</div>';
+  }
+  if (s.status === 'scale_back') {
+    if (!s.budget) return '<div class="f-body" style="font-size:12px;color:#E07070;font-weight:700;margin-top:3px;">Scale back 20% — set budget in Meta</div>';
+    var nd = Math.round(s.budget * 0.8);
+    return '<div class="f-body" style="font-size:12px;color:#E07070;font-weight:700;margin-top:3px;">$' + s.budget + ' → $' + nd + '/day (−20%)</div>';
+  }
+  return '';
 }
 
 function rowHTML(s) {
@@ -728,9 +907,9 @@ function rowHTML(s) {
 function detailHTML(s) {
   var b = rangeFor('adset');
   var w = winFor(s, b.from, b.to);
-  var bgc = { scale:'#EFF7F3', orange:'#FDF4E7', turn_off:'#FCF0F0', new_watch:'#F0F4F6', traffic:'#F0F4F6' }[s.status] || '#F0F4F6';
-  var brc = { scale:'#6BAF8A', orange:'#F4A24A', turn_off:'#E07070', new_watch:'#889CA2', traffic:'#889CA2' }[s.status] || '#C0CDD0';
-  var ttl = { scale:'🚀 Ready to Scale', orange:'🚩 Orange Flag — Watch Closely', turn_off:'⛔ Recommended: Turn Off',
+  var bgc = { scale:'#EFF7F3', scale_back:'#FDF4E7', orange:'#FDF4E7', turn_off:'#FCF0F0', new_watch:'#F0F4F6', traffic:'#F0F4F6' }[s.status] || '#F0F4F6';
+  var brc = { scale:'#6BAF8A', scale_back:'#E07070', orange:'#F4A24A', turn_off:'#E07070', new_watch:'#889CA2', traffic:'#889CA2' }[s.status] || '#C0CDD0';
+  var ttl = { scale:'🚀 Ready to Scale', scale_back:'📉 Scale Back Budget', orange:'🚩 Orange Flag — Watch Closely', turn_off:'⛔ Recommended: Turn Off',
               new_watch:'👁 Watching', traffic:'📣 Traffic Only', hold:'📊 Hold — Stable' }[s.status] || '📊 Hold';
 
   var h = '<div style="background:#FAF8F5;padding:18px 20px;border-top:1px solid #E8F0ED;">';
@@ -834,10 +1013,11 @@ function renderMain() {
   var actionable = [];
   for (var i = 0; i < ADSETS.length; i++) if (!ADSETS[i].traffic) actionable.push(ADSETS[i]);
 
-  var gScale = [], gOff = [], gFlag = [], gNew = [];
+  var gScale = [], gBack = [], gOff = [], gFlag = [], gNew = [];
   for (var a = 0; a < actionable.length; a++) {
     var st = actionable[a].status;
     if (st === 'scale') gScale.push(actionable[a]);
+    else if (st === 'scale_back') gBack.push(actionable[a]);
     else if (st === 'turn_off') gOff.push(actionable[a]);
     else if (st === 'orange') gFlag.push(actionable[a]);
     else if (st === 'new_watch') gNew.push(actionable[a]);
@@ -847,7 +1027,7 @@ function renderMain() {
     var yt = y.firstSeen ? y.firstSeen.getTime() : 0;
     return yt - xt;
   });
-  var groups = { actions: gScale.concat(gOff), flagged: gFlag, new: gNew, all: gAll };
+  var groups = { actions: gScale.concat(gBack).concat(gOff), flagged: gFlag, new: gNew, all: gAll };
   var shown = groups[TAB] || gAll;
 
   // account totals
@@ -902,17 +1082,21 @@ function renderMain() {
   h += '<div class="grid-3" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:22px;">';
   h += statCard('Active Ad Sets', String(ADSETS.length), null, '#2C3535', '#E8F0ED');
   h += statCard('Ready to Scale', String(gScale.length), null, '#6BAF8A', '#6BAF8A');
-  h += statCard('Need Attention', String(gFlag.length + gOff.length), null, gOff.length ? '#E07070' : '#F4A24A', gOff.length ? '#E07070' : '#F4A24A');
+  h += statCard('Need Attention', String(gFlag.length + gOff.length + gBack.length), null, (gOff.length || gBack.length) ? '#E07070' : '#F4A24A', (gOff.length || gBack.length) ? '#E07070' : '#F4A24A');
   h += '</div>';
 
   // offer cards
   h += '<div class="f-body" style="font-size:12px;font-weight:800;color:#4A5858;letter-spacing:.05em;text-transform:uppercase;margin-bottom:10px;">Offers</div>';
-  h += '<div class="offer-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;">';
+  var cols = OFFERS.length >= 4 ? 4 : (OFFERS.length || 1);
+  h += '<div class="offer-grid" style="display:grid;grid-template-columns:repeat(' + cols + ',1fr);gap:12px;margin-bottom:24px;">';
   for (var o = 0; o < OFFERS.length; o++) {
-    var os = offerStats(OFFERS[o].key, b.from, b.to);
+    var od2 = OFFERS[o];
+    var os = offerStats(od2.key, b.from, b.to);
     var showRoas = os.roas !== null ? os.roas : os.metaRoas;
-    h += '<div class="offer-card" data-act="offer" data-v="' + OFFERS[o].key + '">';
-    h += '<div class="f-body" style="font-size:10px;font-weight:800;color:#F49C8E;letter-spacing:.07em;text-transform:uppercase;">' + OFFERS[o].label + '</div>';
+    h += '<div class="offer-card" data-act="offer" data-v="' + encodeURIComponent(od2.key) + '">';
+    h += '<div class="f-body" style="font-size:10px;font-weight:800;color:' + (od2.rt ? '#889CA2' : '#F49C8E') +
+         ';letter-spacing:.07em;text-transform:uppercase;line-height:1.35;min-height:26px;">' +
+         (od2.rt ? '🔁 ' : '') + od2.label + '</div>';
     h += '<div class="f-recoleta" style="font-size:28px;font-weight:900;line-height:1.1;margin:6px 0 2px;color:' + roasColor(showRoas) + ';">' + fR(showRoas) + '</div>';
     h += '<div class="f-body" style="font-size:11px;color:#4A5858;">ROAS · ' + fC(os.spend) + ' spend</div>';
     h += '<div class="f-body" style="font-size:11px;color:#889CA2;margin-top:2px;">' + os.sets.length + ' ad set' + (os.sets.length === 1 ? '' : 's') + ' →</div>';
@@ -950,8 +1134,7 @@ function renderMain() {
 
 /* ── Offer view ─────────────────────────────────────────── */
 function renderOffer() {
-  var od = null;
-  for (var i = 0; i < OFFERS.length; i++) if (OFFERS[i].key === CUR_OFFER) od = OFFERS[i];
+  var od = offerDef(CUR_OFFER);
   if (!od) { PAGE = 'main'; return renderMain(); }
   var b = rangeFor('offer');
   var st = offerStats(od.key, b.from, b.to);
@@ -959,7 +1142,7 @@ function renderOffer() {
   var h = '';
   h += '<span class="back-link" data-act="back">← Back to Account Overview</span>';
   h += '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px;">';
-  h += '<h1 class="f-recoleta" style="font-size:28px;font-weight:900;color:#2C3535;margin:0;">' + od.label + '</h1>';
+  h += '<h1 class="f-recoleta" style="font-size:28px;font-weight:900;color:#2C3535;margin:0;">' + (od.rt ? '🔁 ' : '') + od.label + '</h1>';
   h += '<div class="range-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">';
   h += pillHTML('7-Day', 'of-range', 'd7', offerRange === 'd7');
   h += pillHTML('30-Day', 'of-range', 'd30', offerRange === 'd30');
@@ -1000,7 +1183,7 @@ function renderOffer() {
        '<span class="f-body" style="font-size:10px;font-weight:800;color:#4A5858;letter-spacing:.07em;text-transform:uppercase;">Product</span>' +
        '<span class="f-body" style="font-size:10px;font-weight:800;color:#4A5858;letter-spacing:.07em;text-transform:uppercase;">Units · Conv.</span></div>';
   if (!st.products.length) {
-    h += '<div class="f-body" style="font-size:12.5px;color:#4A5858;padding:10px 0;line-height:1.6;">No product data yet. Add a <b>Hyros Products</b> tab to the Meta sheet with columns: Date, Offer, Product, Role (main/bump/upsell), Units, Revenue.</div>';
+    h += '<div class="f-body" style="font-size:12.5px;color:#4A5858;padding:10px 0;line-height:1.6;">No purchase data yet. Add a <b>Purchases</b> tab to the Meta sheet with columns:<br><b>Date · Order ID · Product · Amount</b><br><span style="font-size:11.5px;color:#889CA2;">One row per line item. Bump and upsell rates are calculated from orders automatically.</span></div>';
   } else {
     for (var p = 0; p < st.products.length; p++) {
       var pr = st.products[p];
@@ -1073,7 +1256,7 @@ document.addEventListener('click', function (e) {
     return;
   }
   if (act === 'tab')        { TAB = v; render(); }
-  else if (act === 'offer') { PAGE = 'offer'; CUR_OFFER = v; openDetail = {}; render(); }
+  else if (act === 'offer') { PAGE = 'offer'; CUR_OFFER = decodeURIComponent(v); openDetail = {}; render(); }
   else if (act === 'back')  { PAGE = 'main'; CUR_OFFER = null; openDetail = {}; render(); }
   else if (act === 'main-range') { mainRange = v; render(); }
   else if (act === 'of-range')   { offerRange = v; render(); }
@@ -1113,7 +1296,8 @@ function loadData() {
     fetchSheet(HYROS_SHEET_7, 'A:K').catch(function () { return []; }),
     fetchSheet(HYROS_SHEET_30, 'A:K').catch(function () { return []; }),
     fetchSheet(HYROS_DAILY, 'A:H').catch(function () { return []; }),
-    fetchSheet(META_SHEET_ID, 'Hyros Products!A:F').catch(function () { return []; })
+    fetchSheet(META_SHEET_ID, 'Hyros Products!A:F').catch(function () { return []; }),
+    fetchSheet(META_SHEET_ID, 'Purchases!A:D').catch(function () { return []; })
   ]).then(function (res) {
     metaRows = res[0];
     hyrosY = parseHyrosWindow(res[1]);
@@ -1121,6 +1305,7 @@ function loadData() {
     hyros30 = parseHyrosWindow(res[3]);
     hyrosDailyMap = parseHyrosDaily(res[4]);
     productRows = parseProducts(res[5]);
+    purchaseRows = parsePurchases(res[6]);
 
     var built = buildAdsets();
     // active only: spent something yesterday
@@ -1130,6 +1315,7 @@ function loadData() {
       if (yw.spend > 0) active.push(built[i]);
     }
     ADSETS = enrich(active);
+    OFFERS = buildOffers();
 
     var now = new Date();
     st.style.color = '#fff'; st.style.opacity = '.75';
