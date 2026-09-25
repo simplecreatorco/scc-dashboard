@@ -1,0 +1,1388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>SCC HQ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&family=Quicksand:wght@700&family=Fraunces:opsz,wght@9..144,400&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  /* Recoleta is licensed; served from our own Worker, which reads it from the SCC Shopify theme */
+  @font-face { font-family:'Recoleta'; font-weight:400; font-display:swap;
+    src:url('https://scc-hq.black-bread-143b.workers.dev/fonts/recoleta-regular.woff2') format('woff2'); }
+
+  *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+  :root {
+    --dusty:#889CA2; --yellow:#F3B548; --coral:#F49C8E; --text:#555555; --white:#FFFFFF;
+    --gray:#F2F2F2; --blush:#F6D5CD; --mint:#EEF6F1; --slate:#5E7278; --line:#DFE6E8;
+    /* status colors: functional, not decorative */
+    --good:#6BAF8A; --warn:#F4A24A; --bad:#E07070;
+    --display:'Recoleta','Fraunces',Georgia,serif;
+    --label:'Quicksand',Helvetica,Arial,sans-serif;
+    --body:'Nunito',Helvetica,Arial,sans-serif;
+  }
+  html, body { background:var(--white); }
+  body { font-family:var(--body); color:var(--text); font-size:15px; line-height:1.6; min-height:100vh; }
+  button { font-family:var(--label); cursor:pointer; }
+  a { color:inherit; }
+  :focus-visible { outline:2px solid var(--dusty); outline-offset:2px; }
+
+  /* Type */
+  .h-hero { font-family:var(--display); font-weight:400; color:var(--dusty); font-size:clamp(30px,5vw,40px); line-height:1.15; }
+  .h-sec  { font-family:var(--display); font-weight:400; color:var(--dusty); font-size:24px; line-height:1.25; }
+  .h-card { font-family:var(--display); font-weight:400; color:var(--dusty); font-size:20px; line-height:1.25; }
+  .eyebrow { font-family:var(--label); font-weight:700; font-size:11px; letter-spacing:3px; text-transform:uppercase; color:var(--coral); }
+  .lab { font-family:var(--label); font-weight:700; font-size:10.5px; letter-spacing:1.5px; text-transform:uppercase; color:var(--dusty); }
+  .num { font-family:var(--body); font-weight:600; color:var(--text); }
+  .muted { color:var(--dusty); }
+  .small { font-size:12.5px; }
+
+  /* Header band */
+  .hq-top { background:var(--gray); }
+  .hq-top-in { max-width:1040px; margin:0 auto; padding:18px 20px 0; }
+  .hq-brandrow { display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; }
+  .hq-brand { display:flex; align-items:center; gap:14px; min-width:0; }
+  .hq-logo { height:34px; width:auto; display:none; }
+  .hq-title { font-family:var(--display); font-weight:400; color:var(--dusty); font-size:28px; line-height:1; }
+  .hq-tools { display:flex; align-items:center; gap:10px; }
+  .sync { font-family:var(--label); font-weight:700; font-size:10.5px; letter-spacing:1.5px; text-transform:uppercase; color:var(--dusty); }
+  .sync.err { color:var(--bad); }
+
+  .nav { display:flex; gap:6px; margin-top:16px; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .nav-btn { background:transparent; border:0; border-bottom:2px solid transparent; padding:10px 14px 12px;
+    font-family:var(--label); font-weight:700; font-size:13px; letter-spacing:2px; text-transform:uppercase;
+    color:var(--text); white-space:nowrap; display:flex; align-items:center; gap:8px; }
+  .nav-btn.on { color:var(--dusty); border-bottom-color:var(--dusty); }
+  .nav-count { background:var(--coral); color:#fff; border-radius:50px; padding:1px 8px; font-size:11px; letter-spacing:0; }
+  .nav-count.zero { background:var(--line); color:var(--text); }
+
+  .wrap { max-width:1040px; margin:0 auto; padding:28px 20px 64px; }
+
+  /* Controls */
+  .pill { display:inline-block; background:#fff; color:var(--dusty); border:1px solid var(--dusty); border-radius:50px;
+    font-family:var(--label); font-weight:700; font-size:11px; letter-spacing:2px; text-transform:uppercase;
+    padding:7px 15px; white-space:nowrap; transition:background .15s, color .15s; }
+  .pill:hover { background:var(--gray); }
+  .pill.on { background:var(--dusty); color:#fff; }
+  .pill.sm { padding:5px 12px; font-size:10.5px; }
+  .btn-primary { display:inline-block; background:var(--yellow); color:#fff; border:0; border-radius:50px;
+    font-family:var(--label); font-weight:700; font-size:12px; letter-spacing:3px; text-transform:uppercase; padding:16px 34px; }
+  .linklab { font-family:var(--label); font-weight:700; font-size:11px; letter-spacing:2px; text-transform:uppercase;
+    color:var(--coral); text-decoration:none; background:none; border:0; padding:0; }
+  .linklab:hover { text-decoration:underline; }
+  input[type="date"], input[type="password"] { font-family:var(--body); font-size:14px; color:var(--text);
+    border:1px solid var(--line); border-radius:12px; padding:8px 12px; background:#fff; outline:none; }
+  input:focus { border-color:var(--dusty); }
+
+  /* Cards */
+  .card { background:#fff; border:1px solid var(--line); border-radius:18px; }
+  .stat { padding:18px 20px; }
+  .stat .v { font-family:var(--body); font-weight:600; font-size:28px; line-height:1.15; margin-top:6px; color:var(--text); }
+  .stat .c { font-size:12px; color:var(--dusty); margin-top:4px; }
+  .grid { display:grid; gap:12px; }
+  .g3 { grid-template-columns:repeat(3,1fr); }
+  .g4 { grid-template-columns:repeat(4,1fr); }
+  .row-between { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+  .range-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+
+  .offer-card { padding:18px 20px; cursor:pointer; transition:border-color .15s; }
+  .offer-card:hover { border-color:var(--dusty); }
+
+  .list { overflow:hidden; }
+  .row { border-bottom:1px solid var(--line); }
+  .row:last-child { border-bottom:0; }
+  .row-in { display:flex; align-items:flex-start; gap:12px; padding:15px 18px; cursor:pointer; border-left:3px solid transparent; transition:background .15s; }
+  .row-in:hover { background:#FAFAFA; }
+  .row-name { font-weight:600; color:var(--text); font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .row-sub { font-size:12px; color:var(--dusty); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:2px; }
+  .badge { display:inline-block; background:#fff; border:1px solid; border-radius:50px; padding:3px 10px;
+    font-family:var(--label); font-weight:700; font-size:10px; letter-spacing:1.5px; text-transform:uppercase; white-space:nowrap; }
+  .chev { display:inline-block; transition:transform .2s; color:var(--dusty); font-size:18px; user-select:none; }
+  .chev.open { transform:rotate(180deg); }
+
+  .cb { width:20px; height:20px; border-radius:6px; flex-shrink:0; border:1.5px solid var(--dusty); background:#fff;
+    margin-top:2px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+  .cb.on { background:var(--good); border-color:var(--good); }
+  .cb.on::after { content:'✓'; color:#fff; font-size:13px; font-weight:700; line-height:1; }
+
+  .detail { display:none; background:var(--gray); padding:20px; border-top:1px solid var(--line); }
+  .detail.open { display:block; }
+  .callout { background:#fff; border:1px solid var(--line); border-left:3px solid var(--dusty); border-radius:12px; padding:13px 16px; }
+  .alert { border-radius:12px; padding:12px 16px; margin-bottom:14px; font-size:13.5px; border:1px solid; background:#fff; }
+  .kv-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+  .kv .v { font-weight:600; font-size:15px; color:var(--text); margin-top:2px; }
+  .prod-row, .prune-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 0; border-bottom:1px solid var(--line); }
+  .prod-row:last-child, .prune-row:last-child { border-bottom:0; }
+  .chart-box { position:relative; height:220px; }
+  .empty { text-align:center; padding:48px 20px; color:var(--text); }
+
+  /* Notifications */
+  .note { padding:18px 20px; border-left:3px solid var(--line); }
+  .note.need { border-left-color:var(--bad); }
+  .note-title { font-weight:600; color:var(--text); font-size:15.5px; line-height:1.4; }
+  .note-details { margin-top:6px; font-size:14px; line-height:1.7; white-space:pre-wrap; word-break:break-word; }
+  .note-details.clamp { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+  .note-meta { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:10px; font-size:12px; color:var(--dusty); }
+  .note-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:14px; }
+  .brand-tag { font-family:var(--label); font-weight:700; font-size:10px; letter-spacing:1.5px; text-transform:uppercase;
+    border:1px solid var(--dusty); color:var(--dusty); border-radius:50px; padding:2px 9px; }
+  .note.leaving { opacity:.35; transition:opacity .25s; }
+
+  /* Login */
+  .login { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; background:var(--gray); }
+  .login-card { width:100%; max-width:400px; padding:40px 32px; text-align:center; }
+  .login-card input { width:100%; margin:24px 0 16px; padding:13px 16px; font-size:15px; text-align:center; }
+  .login-card .btn-primary { width:100%; }
+  .login-err { color:var(--bad); font-size:13px; min-height:20px; margin-top:12px; }
+
+  @media (max-width:720px) {
+    .g3, .g4 { grid-template-columns:repeat(2,1fr); }
+    .kv-grid { grid-template-columns:repeat(2,1fr); }
+    .offer-lower { grid-template-columns:1fr !important; }
+    .camp-right { display:none !important; }
+    .camp-right-mobile { display:flex !important; }
+    .row-name { white-space:normal; }
+    .stat .v { font-size:22px; }
+    .hq-title { font-size:24px; }
+    .chart-box { height:180px; }
+  }
+  @media (prefers-reduced-motion:reduce) { * { transition:none !important; } }
+</style>
+</head>
+<body>
+
+<div id="login" class="login" style="display:none;">
+  <div class="card login-card">
+    <div class="eyebrow">Simple Creator Co.</div>
+    <h1 class="h-hero" style="margin-top:10px;">SCC HQ</h1>
+    <p style="margin-top:8px;">Enter the team password to open the dashboard.</p>
+    <input id="pw" type="password" autocomplete="current-password" placeholder="Password" aria-label="Password" />
+    <button id="login-btn" class="btn-primary">Log in</button>
+    <div id="login-err" class="login-err" role="alert"></div>
+  </div>
+</div>
+
+<div id="app" style="display:none;">
+  <header class="hq-top">
+    <div class="hq-top-in">
+      <div class="hq-brandrow">
+        <div class="hq-brand">
+          <img id="logo" class="hq-logo" alt="Simple Creator Co." />
+          <span class="hq-title">SCC HQ</span>
+        </div>
+        <div class="hq-tools">
+          <span id="sync-status" class="sync">Syncing</span>
+          <button id="refresh-btn" class="pill sm">Refresh</button>
+          <button id="logout-btn" class="linklab">Log out</button>
+        </div>
+      </div>
+      <nav class="nav" id="nav" aria-label="Sections"></nav>
+    </div>
+  </header>
+  <main class="wrap"><div id="view"></div></main>
+</div>
+<script>
+/* ══════════════════════════════════════════════════════════
+   SCC HQ v1 · tabs: Notifications, Ads (Overview is next)
+   This page holds NO keys or sheet IDs. All data comes from the
+   private scc-hq Worker, behind a login.
+   ══════════════════════════════════════════════════════════ */
+
+var API = 'https://scc-hq.black-bread-143b.workers.dev';
+var TOKEN_KEY = 'scc-hq-token';
+
+var HQ_TAB = null;             // 'notifications' | 'ads'
+var INBOX = { items: [], loaded: false, error: null, setup: false };
+var inboxFilter = 'all';       // all | SCC | RRP
+var showSnoozed = false;
+var expandedNotes = {};
+
+/* ── Small helpers ─────────────────────────────────────── */
+function esc(s) {
+  return String(s === null || s === undefined ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function getToken() { try { return localStorage.getItem(TOKEN_KEY); } catch (e) { return window.__tok || null; } }
+function setToken(t) { try { localStorage.setItem(TOKEN_KEY, t); } catch (e) { window.__tok = t; } }
+function clearToken() { try { localStorage.removeItem(TOKEN_KEY); } catch (e) {} window.__tok = null; }
+
+function api(path, opts) {
+  opts = opts || {};
+  var headers = { 'Authorization': 'Bearer ' + (getToken() || '') };
+  if (opts.body) headers['Content-Type'] = 'application/json';
+  return fetch(API + path, { method: opts.method || 'GET', headers: headers, body: opts.body ? JSON.stringify(opts.body) : undefined })
+    .then(function (r) {
+      if (r.status === 401) { clearToken(); showLogin('Please log in again.'); throw new Error('auth'); }
+      return r.json();
+    });
+}
+function timeAgo(iso) {
+  var d = new Date(iso); if (isNaN(d)) return '';
+  var m = Math.round((Date.now() - d.getTime()) / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return m + ' min ago';
+  var h = Math.round(m / 60);
+  if (h < 24) return h + ' hr ago';
+  var days = Math.round(h / 24);
+  if (days < 7) return days + ' day' + (days === 1 ? '' : 's') + ' ago';
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+/* ── Login ────────────────────────────────────────────── */
+function showLogin(msg) {
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login').style.display = 'flex';
+  document.getElementById('login-err').textContent = msg || '';
+  setTimeout(function () { var p = document.getElementById('pw'); if (p) p.focus(); }, 50);
+}
+function doLogin() {
+  var pw = document.getElementById('pw').value;
+  var btn = document.getElementById('login-btn');
+  if (!pw) return;
+  btn.disabled = true; btn.textContent = 'Checking';
+  fetch(API + '/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pw }) })
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      btn.disabled = false; btn.textContent = 'Log in';
+      if (j.ok && j.token) { setToken(j.token); document.getElementById('pw').value = ''; startApp(); }
+      else document.getElementById('login-err').textContent = j.error === 'Wrong password' ? 'That password didn\u2019t match. Try again.' : (j.error || 'Login failed.');
+    })
+    .catch(function () {
+      btn.disabled = false; btn.textContent = 'Log in';
+      document.getElementById('login-err').textContent = 'Couldn\u2019t reach the server. Check your connection and try again.';
+    });
+}
+document.getElementById('login-btn').addEventListener('click', doLogin);
+document.getElementById('pw').addEventListener('keydown', function (e) { if (e.key === 'Enter') doLogin(); });
+document.getElementById('logout-btn').addEventListener('click', function () { clearToken(); showLogin(); });
+
+/* ── Shell ────────────────────────────────────────────── */
+function needsYouCount() {
+  var n = 0;
+  for (var i = 0; i < INBOX.items.length; i++) {
+    var it = INBOX.items[i];
+    if (it.status === 'New' && it.type === 'Needs you') n++;
+  }
+  return n;
+}
+function renderNav() {
+  var n = needsYouCount();
+  var tabs = [['notifications', 'Notifications', n], ['ads', 'Ads', null]];
+  var h = '';
+  for (var i = 0; i < tabs.length; i++) {
+    var on = HQ_TAB === tabs[i][0];
+    h += '<button class="nav-btn' + (on ? ' on' : '') + '" data-act="hq-tab" data-v="' + tabs[i][0] + '"' + (on ? ' aria-current="page"' : '') + '>' + tabs[i][1];
+    if (tabs[i][2] !== null && INBOX.loaded) h += '<span class="nav-count' + (tabs[i][2] ? '' : ' zero') + '">' + tabs[i][2] + '</span>';
+    h += '</button>';
+  }
+  document.getElementById('nav').innerHTML = h;
+}
+function setSync(text, isErr) {
+  var s = document.getElementById('sync-status');
+  s.textContent = text; s.className = 'sync' + (isErr ? ' err' : '');
+}
+function render() {
+  renderNav();
+  if (HQ_TAB === 'notifications') renderNotifications();
+  else if (PAGE === 'offer') renderOffer();
+  else renderMain();
+  setTimeout(broadcastHeight, 120);
+}
+
+/* ── Notifications tab ────────────────────────────────── */
+function loadInbox() {
+  return api('/api/inbox').then(function (j) {
+    INBOX.loaded = true;
+    if (j.ok) { INBOX.items = j.items || []; INBOX.error = null; INBOX.setup = false; }
+    else { INBOX.error = j.error || 'Could not load notifications.'; INBOX.setup = !!j.setup; }
+  }).catch(function (e) {
+    if (e.message === 'auth') throw e;
+    INBOX.loaded = true; INBOX.error = 'Could not reach the server.';
+  });
+}
+function noteHTML(it) {
+  var need = it.type === 'Needs you' && it.status === 'New';
+  var long = (it.details || '').length > 220;
+  var open = !!expandedNotes[it.id];
+  var h = '<div class="card note' + (need ? ' need' : '') + '" id="note-' + esc(it.id) + '">';
+  h += '<div class="note-title">' + esc(it.item) + '</div>';
+  if (it.details) {
+    h += '<div class="note-details' + (long && !open ? ' clamp' : '') + '">' + esc(it.details) + '</div>';
+    if (long) h += '<button class="linklab" style="margin-top:6px;" data-act="note-more" data-v="' + esc(it.id) + '">' + (open ? 'Show less' : 'Show more') + '</button>';
+  }
+  h += '<div class="note-meta">';
+  if (it.brand) h += '<span class="brand-tag">' + esc(it.brand) + '</span>';
+  if (it.source) h += '<span>' + esc(it.source) + '</span>';
+  h += '<span>' + esc(timeAgo(it.created)) + '</span></div>';
+  h += '<div class="note-actions">';
+  h += '<button class="pill sm" data-act="note-set" data-v="' + esc(it.id) + '" data-s="Done">Mark done</button>';
+  if (it.status === 'Snoozed') h += '<button class="pill sm" data-act="note-set" data-v="' + esc(it.id) + '" data-s="New">Unsnooze</button>';
+  else h += '<button class="pill sm" data-act="note-set" data-v="' + esc(it.id) + '" data-s="Snoozed">Snooze</button>';
+  if (it.link) h += '<a class="linklab" href="' + esc(it.link) + '" target="_blank" rel="noopener">Open link</a>';
+  h += '<a class="linklab" href="' + esc(it.url) + '" target="_blank" rel="noopener">Open in Notion</a>';
+  h += '</div></div>';
+  return h;
+}
+function renderNotifications() {
+  var v = document.getElementById('view');
+  var h = '<div class="row-between" style="margin-bottom:22px;align-items:flex-end;">';
+  h += '<div><div class="eyebrow">From your AI team</div><h1 class="h-hero" style="margin-top:8px;">Notifications</h1></div>';
+  h += '<div class="range-row">' + pillHTML('All', 'inbox-filter', 'all', inboxFilter === 'all') +
+       pillHTML('SCC', 'inbox-filter', 'SCC', inboxFilter === 'SCC') + pillHTML('RRP', 'inbox-filter', 'RRP', inboxFilter === 'RRP') + '</div>';
+  h += '</div>';
+
+  if (!INBOX.loaded) { v.innerHTML = h + '<div class="card empty">Loading notifications</div>'; return; }
+  if (INBOX.error) {
+    h += '<div class="card" style="padding:22px 24px;"><div class="h-card">' + (INBOX.setup ? 'Notion isn\u2019t connected yet' : 'Notifications didn\u2019t load') + '</div>';
+    h += '<p style="margin-top:8px;">' + esc(INBOX.error) + '</p></div>';
+    v.innerHTML = h; return;
+  }
+
+  var match = function (it) {
+    if (inboxFilter === 'all') return true;
+    return it.brand === inboxFilter || it.brand === 'Both';
+  };
+  var need = [], fyi = [], snoozed = [];
+  for (var i = 0; i < INBOX.items.length; i++) {
+    var it = INBOX.items[i];
+    if (!match(it)) continue;
+    if (it.status === 'Snoozed') snoozed.push(it);
+    else if (it.type === 'Needs you') need.push(it);
+    else fyi.push(it);
+  }
+
+  if (!need.length && !fyi.length) {
+    h += '<div class="card" style="padding:40px 24px;text-align:center;"><div class="h-card">All clear</div>' +
+         '<p style="margin-top:6px;">Nothing needs you right now. New items from scheduled tasks and skills show up here.</p></div>';
+  }
+  if (need.length) {
+    h += '<h2 class="h-sec" style="margin:4px 0 12px;">Needs You</h2><div class="grid" style="margin-bottom:28px;">';
+    for (var a = 0; a < need.length; a++) h += noteHTML(need[a]);
+    h += '</div>';
+  }
+  if (fyi.length) {
+    h += '<h2 class="h-sec" style="margin:4px 0 12px;">For Your Information</h2><div class="grid" style="margin-bottom:28px;">';
+    for (var b = 0; b < fyi.length; b++) h += noteHTML(fyi[b]);
+    h += '</div>';
+  }
+  if (snoozed.length) {
+    h += '<button class="pill" data-act="toggle-snoozed" style="margin-top:4px;">' + (showSnoozed ? 'Hide' : 'Show') + ' snoozed (' + snoozed.length + ')</button>';
+    if (showSnoozed) {
+      h += '<div class="grid" style="margin-top:14px;">';
+      for (var c = 0; c < snoozed.length; c++) h += noteHTML(snoozed[c]);
+      h += '</div>';
+    }
+  }
+  v.innerHTML = h;
+}
+function setNoteStatus(id, status, btn) {
+  var card = document.getElementById('note-' + id);
+  if (card) card.classList.add('leaving');
+  if (btn) btn.disabled = true;
+  api('/api/inbox/' + id, { method: 'POST', body: { status: status } }).then(function (j) {
+    if (!j.ok) {
+      if (card) card.classList.remove('leaving');
+      if (btn) btn.disabled = false;
+      alert('Couldn\u2019t update that item: ' + (j.error || 'unknown error'));
+      return;
+    }
+    for (var i = 0; i < INBOX.items.length; i++) {
+      if (INBOX.items[i].id === id) {
+        if (status === 'Done') INBOX.items.splice(i, 1);
+        else INBOX.items[i].status = status;
+        break;
+      }
+    }
+    render();
+  }).catch(function (e) {
+    if (e.message === 'auth') return;
+    if (card) card.classList.remove('leaving');
+    if (btn) btn.disabled = false;
+  });
+}
+</script>
+<script>
+/* ══════════════════════════════════════════════════════════
+   Ads tab · ad set level · Meta via Two Minute Reports + Hyros
+   Math and status rules unchanged from dashboard v3.
+   ══════════════════════════════════════════════════════════ */
+
+/* Meta sheet columns (A:P) */
+var M_DATE=0, M_CAMP=1, M_ADSET=2, M_AD=3, M_BUDGET=4, M_SPEND=5,
+    M_CPM=8, M_CPC=10, M_CTR=11, M_PURCH=12, M_ROAS=13, M_VALUE=14, M_FREQ=15;
+/* Hyros window sheets: A=Name B=Status C=Budget D=Clicks E=AdSpend F=TotalRev G=Rev H=Profit I=Net J=Sales K=ROAS */
+var H_NAME=0, H_SPEND=4, H_REV=5, H_SALES=9, H_ROAS=10;
+
+var SCALE_T = 1.4, ORANGE_T = 1.25, OFF_T = 0.75;
+var PRUNE_KILL_SPEND = 100;
+var PRUNE_WATCH_SPEND = 150;
+var CREATIVE_AGE_DAYS = 21;
+var RT_FREQ_ALERT = 3.5;
+
+var C_GOOD = '#6BAF8A', C_WARN = '#F4A24A', C_BAD = '#E07070', C_TEXT = '#555555',
+    C_DUSTY = '#889CA2', C_CORAL = '#F49C8E', C_LINE = '#DFE6E8';
+
+var OFFERS = [];
+var FIXED_OFFERS = [
+  { key:'MTS',  label:'Made to Sell' },
+  { key:'IPSS', label:'IPSS' },
+  { key:'SOR',  label:'Sell on Repeat' }
+];
+var PRODUCT_MAP = [
+  { re:/made to sell|(^|\W)mts(\W|$)/i,        offer:'MTS',  role:'main'   },
+  { re:/launch[- ]?ready|launch toolkit/i,      offer:'MTS',  role:'bump'   },
+  { re:/hook bank/i,                            offer:'MTS',  role:'upsell' },
+  { re:/bot bundle|ai bot/i,                    offer:'MTS',  role:'upsell' },
+  { re:/instagram passive|(^|\W)ipss(\W|$)/i,  offer:'IPSS', role:'main'   },
+  { re:/brand detective/i,                      offer:'IPSS', role:'upsell' },
+  { re:/sell on repeat|(^|\W)sor(\W|$)/i,      offer:'SOR',  role:'main'   }
+];
+function classifyProduct(name) {
+  for (var i = 0; i < PRODUCT_MAP.length; i++) if (PRODUCT_MAP[i].re.test(name || '')) return PRODUCT_MAP[i];
+  return null;
+}
+function isRetargetingText(t) { return /\bRT\b|retarget|warm\s*rt|coupon\s*-\s*warm/i.test(t || ''); }
+function isRTOffer(key) { return String(key || '').indexOf('RT::') === 0; }
+function rtLabel(key) { return String(key).slice(4); }
+function offerKeyFor(camp, adset) {
+  var combo = (camp || '') + ' ' + (adset || '');
+  if (isRetargetingText(combo)) return 'RT::' + String(camp || 'Retargeting').trim();
+  if (/IPSS|instagram passive/i.test(combo)) return 'IPSS';
+  if (/\bSOR\b|sell on repeat/i.test(combo)) return 'SOR';
+  if (/\bMTS\b|made to sell/i.test(combo)) return 'MTS';
+  return 'OTHER';
+}
+function buildOffers() {
+  var out = [];
+  for (var f = 0; f < FIXED_OFFERS.length; f++) {
+    for (var i = 0; i < ADSETS.length; i++) if (ADSETS[i].offer === FIXED_OFFERS[f].key) { out.push(FIXED_OFFERS[f]); break; }
+  }
+  var rtSpend = {};
+  for (var j = 0; j < ADSETS.length; j++) {
+    var s = ADSETS[j];
+    if (!isRTOffer(s.offer)) continue;
+    rtSpend[s.offer] = (rtSpend[s.offer] || 0) + s.d7.spend;
+  }
+  var keys = Object.keys(rtSpend).sort(function (a, b) { return rtSpend[b] - rtSpend[a]; });
+  for (var k = 0; k < keys.length; k++) out.push({ key: keys[k], label: rtLabel(keys[k]), rt: true });
+  return out;
+}
+function offerDef(key) { for (var i = 0; i < OFFERS.length; i++) if (OFFERS[i].key === key) return OFFERS[i]; return null; }
+function productOfferFor(offerKey) {
+  if (!isRTOffer(offerKey)) return offerKey;
+  var camp = rtLabel(offerKey);
+  if (/IPSS/i.test(camp)) return 'IPSS';
+  if (/\bSOR\b|sell on repeat/i.test(camp)) return 'SOR';
+  return 'MTS';
+}
+function isTrafficOnly(text) { return /ig followers|pinned|manychat|\(ID:\s*W\d+\)|engagement/i.test(text || ''); }
+
+/* ── State ────────────────────────────────────────────── */
+var metaRows = [], hyrosY = null, hyros7 = null, hyros30 = null;
+var hyrosDailyMap = {}, productRows = [], purchaseRows = [];
+var ADSETS = [], ADS_LOADED = false, ADS_ERROR = null, ADS_SOFT_ERRORS = {};
+var PAGE = 'main', CUR_OFFER = null;
+var TAB = 'actions';
+var mainRange = 'd7', offerRange = 'd7', adsetRange = 'd7';
+var mainCustom = {from:null,to:null}, offerCustom = {from:null,to:null}, adsetCustom = {from:null,to:null};
+var mainChartTab = 'spend', offerChartTab = 'spend', adsetChartTab = 'roas';
+var openDetail = {};
+var checked = {};
+var chartRefs = {};
+
+function loadChecked() {
+  try {
+    var raw = localStorage.getItem('scc-checked');
+    if (!raw) return {};
+    var o = JSON.parse(raw);
+    if (o.date !== dateKey(todayMid())) return {};
+    return o.map || {};
+  } catch (e) { return {}; }
+}
+function saveChecked() {
+  try { localStorage.setItem('scc-checked', JSON.stringify({ date: dateKey(todayMid()), map: checked })); } catch (e) {}
+}
+
+/* ── Dates ────────────────────────────────────────────── */
+function todayMid() { var t = new Date(); t.setHours(0,0,0,0); return t; }
+function daysAgo(n) { var d = new Date(todayMid()); d.setDate(d.getDate() - n); return d; }
+function dateKey(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+function parseDate(s) {
+  if (!s) return null;
+  var str = String(s).trim();
+  var p = str.split('-');
+  if (p.length === 3 && p[0].length === 4) {
+    var y = +p[0], m = +p[1], d = +String(p[2]).slice(0,2);
+    if (!isNaN(y) && !isNaN(m) && !isNaN(d)) return new Date(y, m-1, d);
+  }
+  var p2 = str.split('/');
+  if (p2.length === 3) {
+    var mm = +p2[0], dd = +p2[1], yy = +p2[2];
+    if (!isNaN(yy)) return new Date(yy < 100 ? 2000+yy : yy, mm-1, dd);
+  }
+  return null;
+}
+function rangeFor(which) {
+  var r, c;
+  if (which === 'main') { r = mainRange; c = mainCustom; }
+  else if (which === 'offer') { r = offerRange; c = offerCustom; }
+  else { r = adsetRange; c = adsetCustom; }
+  if (r === 'custom' && c.from && c.to) return { from: parseDate(c.from), to: parseDate(c.to) };
+  var n = { y:1, d7:7, d14:14, d30:30 }[r] || 7;
+  return { from: daysAgo(n), to: todayMid() };
+}
+function sameDay(a, b) { return !!a && !!b && a.getTime() === b.getTime(); }
+function windowKind(from, to) {
+  if (!sameDay(to, todayMid())) return null;
+  if (sameDay(from, daysAgo(1)))  return 'y';
+  if (sameDay(from, daysAgo(7)))  return 'd7';
+  if (sameDay(from, daysAgo(30))) return 'd30';
+  return null;
+}
+
+/* ── Numbers ──────────────────────────────────────────── */
+function num(v) { if (v === null || v === undefined || v === '') return 0; var n = parseFloat(String(v).replace(/[$,%\s]/g, '')); return isNaN(n) ? 0 : n; }
+function numOrNull(v) { if (v === null || v === undefined || v === '') return null; var n = parseFloat(String(v).replace(/[$,%\s]/g, '')); return isNaN(n) ? null : n; }
+function fC(v) { return (v === null || v === undefined || isNaN(v)) ? '–' : '$' + Math.round(v).toLocaleString('en-US'); }
+function fR(v) { return (v === null || v === undefined || isNaN(v)) ? '–' : Number(v).toFixed(2); }
+function fD(v) { return (v === null || v === undefined || isNaN(v)) ? '–' : '$' + Number(v).toFixed(2); }
+function fPct(v) { return (v === null || v === undefined || isNaN(v)) ? '–' : Number(v).toFixed(1) + '%'; }
+function roasColor(v) {
+  if (v === null || v === undefined || isNaN(v)) return C_TEXT;
+  if (v >= SCALE_T) return C_GOOD;
+  if (v >= 1.0) return C_WARN;
+  return C_BAD;
+}
+function idToken(name) {
+  var m = String(name || '').match(/\(ID:\s*([A-Za-z0-9]+)\)/i);
+  if (!m) return null;
+  return /^\d+$/.test(m[1]) ? String(parseInt(m[1], 10)) : m[1].toUpperCase();
+}
+
+/* ── Parsers ──────────────────────────────────────────── */
+function parseHyrosWindow(rows) {
+  var map = {}, total = null;
+  if (!rows || rows.length < 2) return { map: map, total: total };
+  for (var i = 1; i < rows.length; i++) {
+    var row = rows[i];
+    var name = String((row[H_NAME] || '')).trim();
+    if (!name) continue;
+    var entry = { rev: numOrNull(row[H_REV]), roas: numOrNull(row[H_ROAS]), spend: numOrNull(row[H_SPEND]), sales: numOrNull(row[H_SALES]) };
+    if (name.toLowerCase() === 'total') { total = entry; continue; }
+    var id = idToken(name);
+    if (id) map['id:' + id] = entry;
+    map['name:' + name.toLowerCase()] = entry;
+  }
+  return { map: map, total: total };
+}
+function matchHyros(adsetName, campaignName, parsed) {
+  if (!parsed || !parsed.map) return null;
+  var m = parsed.map;
+  var id = idToken(adsetName) || idToken(campaignName);
+  if (id && m['id:' + id]) return m['id:' + id];
+  var lower = String(adsetName || '').toLowerCase();
+  if (m['name:' + lower]) return m['name:' + lower];
+  var clower = String(campaignName || '').toLowerCase();
+  if (m['name:' + clower]) return m['name:' + clower];
+  return null;
+}
+function parseHyrosDaily(rows) {
+  var map = {};
+  if (!rows || rows.length < 2) return map;
+  for (var i = 1; i < rows.length; i++) {
+    var d = parseDate(rows[i][1]);
+    if (!d) continue;
+    map[dateKey(d)] = { rev: num(rows[i][4]), sales: num(rows[i][6]) };
+  }
+  return map;
+}
+function parseProducts(rows) {
+  var out = [];
+  if (!rows || rows.length < 2) return out;
+  for (var i = 1; i < rows.length; i++) {
+    var row = rows[i], d = parseDate(row[0]);
+    if (!d) continue;
+    out.push({ date: dateKey(d), offer: String(row[1] || '').toUpperCase().trim(), product: String(row[2] || '').trim(),
+               role: String(row[3] || '').toLowerCase().trim(), units: num(row[4]), rev: num(row[5]) });
+  }
+  return out;
+}
+function parsePurchases(rows) {
+  var out = [];
+  if (!rows || rows.length < 2) return out;
+  for (var i = 1; i < rows.length; i++) {
+    var row = rows[i], d = parseDate(row[0]);
+    if (!d) continue;
+    var prod = String(row[2] || '').trim();
+    if (!prod) continue;
+    out.push({ dateObj: d, orderId: String(row[1] || '').trim(), product: prod, amount: num(row[3]) });
+  }
+  return out;
+}
+
+/* ── Build ad sets ────────────────────────────────────── */
+function buildAdsets() {
+  var byKey = {}, acctDaySpend = {};
+  for (var i = 1; i < metaRows.length; i++) {
+    var row = metaRows[i], d = parseDate(row[M_DATE]);
+    if (!d) continue;
+    var adset = String((row[M_ADSET] || '')).trim(), camp = String((row[M_CAMP] || '')).trim();
+    if (!adset && !camp) continue;
+    var key = (camp + ' ||| ' + adset).toLowerCase();
+    if (!byKey[key]) byKey[key] = { adset: adset || camp, campaign: camp, rows: [] };
+    byKey[key].rows.push(row);
+    var dk = dateKey(d);
+    acctDaySpend[dk] = (acctDaySpend[dk] || 0) + num(row[M_SPEND]);
+  }
+  var out = [];
+  for (var k in byKey) {
+    if (!byKey.hasOwnProperty(k)) continue;
+    var g = byKey[k], name = g.adset, camp2 = g.campaign, combo = camp2 + ' ' + name;
+    var dayMap = {}, adMap = {}, firstSeen = null, budget = 0;
+    for (var r = 0; r < g.rows.length; r++) {
+      var rw = g.rows[r], dd = parseDate(rw[M_DATE]);
+      if (!dd) continue;
+      var dkey = dateKey(dd), sp = num(rw[M_SPEND]);
+      if (!dayMap[dkey]) dayMap[dkey] = { spend:0, purch:0, val:0, freq:0, fn:0, cpm:0, cpc:0, ctr:0, cn:0 };
+      var dm = dayMap[dkey];
+      dm.spend += sp; dm.purch += num(rw[M_PURCH]); dm.val += num(rw[M_VALUE]);
+      var fq = num(rw[M_FREQ]); if (fq > 0) { dm.freq += fq; dm.fn++; }
+      var cpmv = num(rw[M_CPM]); if (cpmv > 0) { dm.cpm += cpmv; dm.cpc += num(rw[M_CPC]); dm.ctr += num(rw[M_CTR]); dm.cn++; }
+      var b = num(rw[M_BUDGET]); if (b > 0) budget = b;
+      if (sp > 0 && (!firstSeen || dd < firstSeen)) firstSeen = dd;
+      var adName = String((rw[M_AD] || '')).trim();
+      if (adName) {
+        if (!adMap[adName]) adMap[adName] = { name:adName, spend:0, purch:0, val:0, first:null };
+        var am = adMap[adName];
+        if (dd >= daysAgo(30)) { am.spend += sp; am.purch += num(rw[M_PURCH]); am.val += num(rw[M_VALUE]); }
+        if (sp > 0 && (!am.first || dd < am.first)) am.first = dd;
+      }
+    }
+    var daysLive = firstSeen ? Math.floor((todayMid() - firstSeen) / 86400000) : 99;
+    var newest = null;
+    for (var an in adMap) if (adMap.hasOwnProperty(an)) { var f = adMap[an].first; if (f && (!newest || f > newest)) newest = f; }
+    var pruneKill = [], pruneWatch = [];
+    for (var an2 in adMap) {
+      if (!adMap.hasOwnProperty(an2)) continue;
+      var a2 = adMap[an2];
+      if (a2.spend >= PRUNE_KILL_SPEND && a2.purch === 0) pruneKill.push({ name:a2.name, spend:a2.spend, sales:0, roas:0 });
+      else if (a2.spend >= PRUNE_WATCH_SPEND && (a2.val / a2.spend) < 0.5) pruneWatch.push({ name:a2.name, spend:a2.spend, sales:a2.purch, roas:a2.val/a2.spend });
+    }
+    pruneKill.sort(function(x,y){ return y.spend - x.spend; });
+    pruneWatch.sort(function(x,y){ return y.spend - x.spend; });
+    out.push({
+      key: k, name: name, campaign: camp2, offer: offerKeyFor(camp2, name), traffic: isTrafficOnly(combo),
+      id: idToken(name) || idToken(camp2) || null, budget: budget, dayMap: dayMap, adMap: adMap, acctDaySpend: acctDaySpend,
+      firstSeen: firstSeen, daysLive: daysLive, isNew: daysLive < 3,
+      creativeAge: newest ? Math.floor((todayMid() - newest) / 86400000) : null, pruneKill: pruneKill, pruneWatch: pruneWatch
+    });
+  }
+  return out;
+}
+
+function winFor(s, from, to) {
+  var spend=0, purch=0, val=0, fq=0, fn=0, cpm=0, cpc=0, ctr=0, cn=0, hRev=0, hAny=false;
+  for (var dk in s.dayMap) {
+    if (!s.dayMap.hasOwnProperty(dk)) continue;
+    var d = parseDate(dk);
+    if (!d || d < from || d > to) continue;
+    var dm = s.dayMap[dk];
+    spend += dm.spend; purch += dm.purch; val += dm.val;
+    if (dm.fn) { fq += dm.freq / dm.fn; fn++; }
+    if (dm.cn) { cpm += dm.cpm/dm.cn; cpc += dm.cpc/dm.cn; ctr += dm.ctr/dm.cn; cn++; }
+    var acct = s.acctDaySpend[dk] || 0, day = hyrosDailyMap[dk];
+    if (day && day.rev > 0 && acct > 0) { hRev += (dm.spend / acct) * day.rev; if (dm.spend > 0) hAny = true; }
+  }
+  /* Real per-ad-set Hyros beats the spend-share estimate when the window matches a Hyros sheet */
+  var kind = windowKind(from, to);
+  var real = (kind && s.hyRaw) ? s.hyRaw[kind] : null;
+  var matched = false;
+  if (real && real.rev !== null && real.rev !== undefined) { hRev = real.rev; hAny = true; matched = true; }
+  var hRoas = null;
+  if (matched && real.roas !== null && real.roas !== undefined) hRoas = real.roas;
+  else if (hAny && spend > 0) hRoas = hRev / spend;
+  return {
+    spend: spend, purch: purch, val: val, freq: fn ? fq/fn : null,
+    cpm: cn ? cpm/cn : null, cpc: cn ? cpc/cn : null, ctr: cn ? ctr/cn : null,
+    metaRoas: spend > 0 ? val/spend : null, hyrosRev: hAny ? hRev : null, hyrosRoas: hRoas,
+    hyrosSales: matched && real.sales !== null ? real.sales : null, hyrosMatched: matched
+  };
+}
+
+function enrich(list) {
+  for (var i = 0; i < list.length; i++) {
+    var s = list[i];
+    s.hyRaw = { y: matchHyros(s.name, s.campaign, hyrosY), d7: matchHyros(s.name, s.campaign, hyros7), d30: matchHyros(s.name, s.campaign, hyros30) };
+    s.hyrosMatched = !!(s.hyRaw.d7 || s.hyRaw.d30 || s.hyRaw.y);
+    s.y = winFor(s, daysAgo(1), todayMid());
+    s.d7 = winFor(s, daysAgo(7), todayMid());
+    s.d14 = winFor(s, daysAgo(14), todayMid());
+    s.d30 = winFor(s, daysAgo(30), todayMid());
+    s.hy = { yRoas: s.y.hyrosRoas, r7: s.d7.hyrosRoas, r14: s.d14.hyrosRoas, r30: s.d30.hyrosRoas,
+             revY: s.y.hyrosRev, rev7: s.d7.hyrosRev, rev30: s.d30.hyrosRev,
+             salesY: s.y.hyrosSales, sales7: s.d7.hyrosSales, sales30: s.d30.hyrosSales };
+
+    var m7 = s.d7.metaRoas, h7 = s.hy.r7, mY = s.y.metaRoas, hY = s.hy.yRoas;
+    var scale7 = (m7 !== null && m7 >= SCALE_T) || (h7 !== null && h7 >= SCALE_T);
+    var yestBothWeak = (mY === null || mY < SCALE_T) && (hY === null || hY < SCALE_T);
+    var primary = (h7 !== null) ? h7 : m7;
+    var sales7 = s.d7.purch + (s.hy.sales7 || 0);
+    var status;
+    if (s.traffic) status = 'traffic';
+    else if (s.isNew) status = 'new_watch';
+    else if (isRTOffer(s.offer)) {
+      /* Retargeting is never turned off; it scales up or scales back */
+      if (primary === null) status = 'hold';
+      else if (scale7 && !yestBothWeak) status = 'scale';
+      else if (primary < 1.0) status = 'scale_back';
+      else status = 'hold';
+    }
+    else if (sales7 === 0 && s.daysLive >= 3) status = 'turn_off';
+    else if (primary === null) status = 'hold';
+    else if (scale7 && !yestBothWeak) status = 'scale';
+    else if (scale7 && yestBothWeak) status = 'hold';
+    else if (primary >= ORANGE_T) status = 'hold';
+    else if (primary >= 1.0) { var r14 = s.d14.metaRoas; status = (r14 !== null && m7 !== null && m7 < r14) ? 'orange' : 'hold'; }
+    else {
+      var yOK = (mY !== null && mY >= 1.0) || (hY !== null && hY >= 1.0);
+      if (yOK) status = 'orange';
+      else if (m7 !== null && h7 !== null && m7 < OFF_T && h7 < OFF_T) status = 'turn_off';
+      else status = 'orange';
+    }
+    s.status = status;
+    s.insight = buildInsight(s);
+  }
+  return list;
+}
+
+function buildInsight(s) {
+  var m7 = s.d7.metaRoas, h7 = s.hy.r7, mY = s.y.metaRoas, hY = s.hy.yRoas, m14 = s.d14.metaRoas;
+  var parts = [];
+  if (s.status === 'scale') {
+    var mA = m7 !== null && m7 >= SCALE_T, hA = h7 !== null && h7 >= SCALE_T;
+    if (mA && hA) parts.push('Meta 7-day ' + fR(m7) + ' and Hyros 7-day ' + fR(h7) + ', both above the scale threshold.');
+    else if (mA) parts.push('Meta 7-day ROAS ' + fR(m7) + ' is above the scale threshold.' + (h7 !== null ? ' Hyros: ' + fR(h7) + '.' : ''));
+    else if (hA) parts.push('Hyros 7-day ROAS ' + fR(h7) + ' is above the scale threshold.' + (m7 !== null ? ' Meta: ' + fR(m7) + '.' : ''));
+    if ((mY !== null && mY >= SCALE_T) || (hY !== null && hY >= SCALE_T))
+      parts.push('Yesterday was strong too: ' + (mY !== null ? 'Meta ' + fR(mY) : '') + (hY !== null ? ', Hyros ' + fR(hY) : '') + '.');
+    if (s.d7.cpm !== null && s.d7.cpm <= 20) parts.push('CPM ' + fD(s.d7.cpm) + ', healthy delivery.');
+  } else if (s.status === 'scale_back') {
+    var pb = (h7 !== null) ? h7 : m7;
+    parts.push('7-day ROAS ' + fR(pb) + ' is below break-even. Retargeting never gets turned off; trim the budget and let the pool recover.');
+    if (s.d7.freq !== null && s.d7.freq >= RT_FREQ_ALERT) parts.push('Frequency ' + s.d7.freq.toFixed(1) + 'x means the audience is saturated.');
+  } else if (s.status === 'turn_off') {
+    if ((s.d7.purch + (s.hy.sales7||0)) === 0) parts.push('No sales in 7 days on ' + fC(s.d7.spend) + ' spend. Turn it off.');
+    else parts.push('Meta ' + fR(m7) + ' and Hyros ' + fR(h7) + ' are both below the turn-off threshold (' + OFF_T + ').');
+  } else if (s.status === 'orange') {
+    var p = (h7 !== null) ? h7 : m7;
+    if (p !== null && p >= 1.0) parts.push('7-day ROAS ' + fR(p) + ' is above break-even but trending down against the 14-day (' + fR(m14) + ').');
+    else parts.push('7-day ROAS ' + fR(p) + ' is below break-even. Yesterday was ' + fR(hY !== null ? hY : mY) + ', so watch before making the turn-off call.');
+  } else if (s.status === 'new_watch') {
+    var sold = s.d7.purch;
+    parts.push('Day ' + (s.daysLive + 1) + ' of 3. ' + (sold > 0 ? sold + ' sale' + (sold===1?'':'s') + ' so far.' : 'No sales yet. Turns off if still zero after Day 3.'));
+  } else if (s.status === 'traffic') {
+    parts.push('Traffic or engagement placement with no ROAS target. Reference only.');
+  } else {
+    var ph = (h7 !== null) ? h7 : m7;
+    parts.push(ph !== null ? '7-day ROAS ' + fR(ph) + ' is stable. No action needed.' : 'Not enough data yet, holding.');
+  }
+  if (!s.traffic && s.creativeAge !== null && s.creativeAge >= CREATIVE_AGE_DAYS)
+    parts.push('Newest creative is ' + s.creativeAge + ' days old. Time to refresh.');
+  return parts.join(' ');
+}
+
+function offerStats(offerKey, from, to) {
+  var sets = [];
+  for (var i = 0; i < ADSETS.length; i++) if (ADSETS[i].offer === offerKey) sets.push(ADSETS[i]);
+  var spend = 0, metaVal = 0, metaPurch = 0, hRev = 0, hAny = false, matchedSets = 0;
+  for (var j = 0; j < sets.length; j++) {
+    var w = winFor(sets[j], from, to);
+    spend += w.spend; metaVal += w.val; metaPurch += w.purch;
+    if (w.hyrosRev !== null) { hRev += w.hyrosRev; hAny = true; }
+    if (sets[j].hyrosMatched) matchedSets++;
+  }
+  var pdata = computeProducts(productOfferFor(offerKey), from, to);
+  /* Primary = Meta attributed value (Hyros last-touch under-credits retargeting); Hyros shown alongside */
+  var rev = metaVal > 0 ? metaVal : null;
+  var hyrosRev = hAny ? hRev : null;
+  var buyers = pdata.mainUnits > 0 ? pdata.mainUnits : (metaPurch > 0 ? metaPurch : null);
+  return {
+    sets: sets, spend: spend, rev: rev, roas: (rev !== null && spend > 0) ? rev/spend : null,
+    metaRoas: spend > 0 ? metaVal/spend : null, metaPurch: metaPurch, hyrosRev: hyrosRev,
+    hyrosRoas: (hyrosRev !== null && spend > 0) ? hyrosRev/spend : null, profit: rev !== null ? rev - spend : null,
+    aov: pdata.aov !== null ? pdata.aov : ((rev !== null && buyers) ? rev/buyers : null),
+    cpb: (buyers && spend > 0) ? spend/buyers : null, products: pdata.products, mainUnits: pdata.mainUnits,
+    productSource: pdata.source, matchedSets: matchedSets, totalSets: sets.length
+  };
+}
+function computeProducts(offerKey, from, to) {
+  var empty = { products: [], mainUnits: 0, aov: null, source: 'none' };
+  if (offerKey === 'OTHER') return empty;
+  if (purchaseRows.length) {
+    var orders = {};
+    for (var i = 0; i < purchaseRows.length; i++) {
+      var r = purchaseRows[i];
+      if (!r.dateObj || r.dateObj < from || r.dateObj > to) continue;
+      var oid = r.orderId || ('row' + i);
+      if (!orders[oid]) orders[oid] = { items: [], total: 0 };
+      orders[oid].items.push(r); orders[oid].total += r.amount;
+    }
+    var mainOrders = 0, mainRev = 0, counts = {}, labels = {};
+    for (var oid2 in orders) {
+      if (!orders.hasOwnProperty(oid2)) continue;
+      var o = orders[oid2], hasMain = false;
+      for (var it = 0; it < o.items.length; it++) {
+        var cls = classifyProduct(o.items[it].product);
+        if (cls && cls.offer === offerKey && cls.role === 'main') { hasMain = true; break; }
+      }
+      if (!hasMain) continue;
+      mainOrders++; mainRev += o.total;
+      var seen = {};
+      for (var it2 = 0; it2 < o.items.length; it2++) {
+        var item = o.items[it2], c2 = classifyProduct(item.product);
+        if (!c2 || c2.offer !== offerKey) continue;
+        var key = c2.role + '|' + item.product;
+        if (seen[key]) continue;
+        seen[key] = true;
+        counts[key] = (counts[key] || 0) + 1;
+        labels[key] = { product: item.product, role: c2.role };
+      }
+    }
+    if (!mainOrders) return empty;
+    var list = [];
+    for (var k in counts) if (counts.hasOwnProperty(k)) list.push({ product: labels[k].product, role: labels[k].role, units: counts[k], rev: 0 });
+    sortProducts(list);
+    return { products: list, mainUnits: mainOrders, aov: mainRev / mainOrders, source: 'purchases' };
+  }
+  if (productRows.length) {
+    var pm = {}, mu = 0;
+    for (var p = 0; p < productRows.length; p++) {
+      var pr = productRows[p];
+      if (pr.offer !== offerKey) continue;
+      var pd2 = parseDate(pr.date);
+      if (!pd2 || pd2 < from || pd2 > to) continue;
+      var pk = pr.role + '|' + pr.product;
+      if (!pm[pk]) pm[pk] = { product: pr.product, role: pr.role, units: 0, rev: 0 };
+      pm[pk].units += pr.units; pm[pk].rev += pr.rev;
+      if (pr.role === 'main') mu += pr.units;
+    }
+    var arr = [];
+    for (var pk2 in pm) if (pm.hasOwnProperty(pk2)) arr.push(pm[pk2]);
+    if (!arr.length) return empty;
+    sortProducts(arr);
+    var totRev = 0;
+    for (var a2 = 0; a2 < arr.length; a2++) totRev += arr[a2].rev;
+    return { products: arr, mainUnits: mu, aov: mu > 0 ? totRev / mu : null, source: 'aggregated' };
+  }
+  return empty;
+}
+function sortProducts(arr) {
+  arr.sort(function (a, b) {
+    var ord = { main:0, bump:1, upsell:2 };
+    var oa = ord[a.role] === undefined ? 3 : ord[a.role], ob = ord[b.role] === undefined ? 3 : ord[b.role];
+    return oa - ob || b.units - a.units;
+  });
+}
+
+function dailySeries(sets, from, to) {
+  var days = {}, yKey = dateKey(daysAgo(1)), kind = windowKind(from, to);
+  for (var i = 0; i < sets.length; i++) {
+    var s = sets[i], myDays = [], mySpend = 0;
+    for (var dk0 in s.dayMap) {
+      if (!s.dayMap.hasOwnProperty(dk0)) continue;
+      var d0 = parseDate(dk0);
+      if (!d0 || d0 < from || d0 > to) continue;
+      myDays.push(dk0); mySpend += s.dayMap[dk0].spend;
+      if (!days[dk0]) days[dk0] = { spend:0, val:0, hRev:0 };
+      days[dk0].spend += s.dayMap[dk0].spend; days[dk0].val += s.dayMap[dk0].val;
+    }
+    if (!myDays.length) continue;
+    var realTot = (kind && s.hyRaw && s.hyRaw[kind] && s.hyRaw[kind].rev !== null) ? s.hyRaw[kind].rev : null;
+    var realY = (s.hyRaw && s.hyRaw.y && s.hyRaw.y.rev !== null) ? s.hyRaw.y.rev : null;
+    var hasY = myDays.indexOf(yKey) !== -1;
+    if (realTot !== null) {
+      var pinY = (hasY && realY !== null) ? Math.min(realY, realTot) : null;
+      var rest = realTot - (pinY === null ? 0 : pinY);
+      var restSpend = mySpend - ((pinY === null) ? 0 : (s.dayMap[yKey] ? s.dayMap[yKey].spend : 0));
+      for (var m = 0; m < myDays.length; m++) {
+        var kk = myDays[m];
+        if (pinY !== null && kk === yKey) { days[kk].hRev += pinY; continue; }
+        days[kk].hRev += restSpend > 0 ? (s.dayMap[kk].spend / restSpend) * rest : (rest / myDays.length);
+      }
+    } else {
+      for (var m2 = 0; m2 < myDays.length; m2++) {
+        var kk2 = myDays[m2];
+        if (kk2 === yKey && realY !== null) { days[kk2].hRev += realY; continue; }
+        var acct = s.acctDaySpend[kk2] || 0, hd = hyrosDailyMap[kk2];
+        if (hd && hd.rev > 0 && acct > 0) days[kk2].hRev += (s.dayMap[kk2].spend / acct) * hd.rev;
+      }
+    }
+  }
+  var keys = Object.keys(days).sort();
+  var out = { labels: [], spend: [], hRev: [], metaRev: [], metaRoas: [], hyrosRoas: [] };
+  for (var k = 0; k < keys.length; k++) {
+    var key = keys[k], v = days[key], dd = parseDate(key);
+    out.labels.push(dd ? dd.toLocaleString('en-US', { month:'short', day:'numeric' }) : key);
+    out.spend.push(Math.round(v.spend)); out.hRev.push(Math.round(v.hRev)); out.metaRev.push(Math.round(v.val));
+    out.metaRoas.push(v.spend > 0 ? +(v.val / v.spend).toFixed(2) : 0);
+    out.hyrosRoas.push(v.spend > 0 ? +(v.hRev / v.spend).toFixed(2) : 0);
+  }
+  return out;
+}
+
+function drawLineChart(canvasId, series, mode, refKey) {
+  var canvas = document.getElementById(canvasId);
+  if (!canvas || !window.Chart) return;
+  if (chartRefs[refKey]) { try { chartRefs[refKey].destroy(); } catch (e) {} }
+  var isRoas = mode === 'roas';
+  var line = function (label, data, color) {
+    return { label: label, data: data, borderColor: color, borderWidth: 2.5, pointRadius: 3, pointBackgroundColor: color, tension: .3, fill: false };
+  };
+  var ds = isRoas ? [
+    { label:'Break even', data: series.labels.map(function(){return 1.0;}), borderColor:C_LINE, borderWidth:1.5, borderDash:[4,4], pointRadius:0, fill:false },
+    { label:'Scale (1.4)', data: series.labels.map(function(){return SCALE_T;}), borderColor:C_WARN, borderWidth:1.5, borderDash:[4,4], pointRadius:0, fill:false },
+    line('Meta ROAS', series.metaRoas, C_DUSTY), line('Hyros ROAS', series.hyrosRoas, C_CORAL)
+  ] : [
+    line('Meta Revenue', series.metaRev, C_GOOD), line('Hyros Revenue', series.hRev, C_CORAL), line('Ad Spend', series.spend, C_DUSTY)
+  ];
+  var font = { family: 'Nunito', size: 11 };
+  chartRefs[refKey] = new Chart(canvas.getContext('2d'), {
+    type: 'line',
+    data: { labels: series.labels, datasets: ds },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: true, labels: {
+          filter: function (it) { return it.text !== 'Break even' && it.text !== 'Scale (1.4)'; },
+          usePointStyle: true, pointStyle: 'circle', boxWidth: 8, boxHeight: 8, font: font, color: C_TEXT, padding: 14 } },
+        tooltip: { backgroundColor:'#fff', titleColor:C_DUSTY, bodyColor:C_TEXT, borderColor:C_LINE, borderWidth:1, padding:10,
+          mode:'index', intersect:false, usePointStyle:true, boxPadding:4,
+          titleFont:{family:'Nunito',size:11,weight:'700'}, bodyFont:{family:'Nunito',size:12,weight:'600'},
+          filter: function (it) { return it.dataset.label !== 'Break even' && it.dataset.label !== 'Scale (1.4)'; },
+          callbacks: { label: function (ctx) {
+            var v = ctx.parsed.y;
+            return isRoas ? ' ' + ctx.dataset.label + ': ' + Number(v).toFixed(2) + 'x' : ' ' + ctx.dataset.label + ': $' + Math.round(v).toLocaleString('en-US');
+          } } }
+      },
+      scales: {
+        x: { grid:{display:false}, border:{display:false}, ticks:{ font:{family:'Nunito',size:10}, color:C_TEXT } },
+        y: { min:0, grid:{color:C_LINE}, border:{display:false},
+             ticks:{ font:{family:'Nunito',size:10}, color:C_TEXT, maxTicksLimit:6,
+               callback: function (v) {
+                 if (isRoas) return Number(v).toFixed(1);
+                 if (v === 0) return '$0';
+                 if (v >= 1000) return '$' + (v/1000).toFixed(v % 1000 === 0 ? 0 : 1) + 'k';
+                 return '$' + Math.round(v);
+               } } }
+      }
+    }
+  });
+}
+</script>
+<script>
+/* ── Builders ─────────────────────────────────────────── */
+var STATUS = {
+  scale:      { label:'Scale 9%',    color:C_GOOD,  title:'Ready to Scale' },
+  scale_back: { label:'Scale Back',  color:C_BAD,   title:'Scale Back the Budget' },
+  orange:     { label:'Orange Flag', color:C_WARN,  title:'Orange Flag, Watch Closely' },
+  turn_off:   { label:'Turn Off',    color:C_BAD,   title:'Recommended: Turn Off' },
+  new_watch:  { label:'Watching',    color:C_DUSTY, title:'Watching' },
+  hold:       { label:'Hold',        color:C_DUSTY, title:'Hold, Stable' },
+  traffic:    { label:'Traffic',     color:C_DUSTY, title:'Traffic Only' }
+};
+function st(s) { return STATUS[s] || STATUS.hold; }
+function badgeHTML(status) { var x = st(status); return '<span class="badge" style="color:' + x.color + ';border-color:' + x.color + ';">' + x.label + '</span>'; }
+function borderFor(status) { return (status === 'hold' || status === 'traffic') ? 'transparent' : st(status).color; }
+function pillHTML(label, act, val, on) {
+  return '<button class="pill sm' + (on ? ' on' : '') + '" data-act="' + act + '" data-v="' + val + '">' + label + '</button>';
+}
+function dualRoasHTML(m, h) {
+  return '<div style="display:flex;gap:12px;align-items:center;flex-shrink:0;">' +
+    '<div style="text-align:center;"><div class="lab" style="font-size:9.5px;">Meta</div><div class="num" style="font-size:17px;color:' + roasColor(m) + ';">' + fR(m) + '</div></div>' +
+    '<div style="width:1px;height:28px;background:' + C_LINE + ';"></div>' +
+    '<div style="text-align:center;"><div class="lab" style="font-size:9.5px;">Hyros</div><div class="num" style="font-size:17px;color:' + roasColor(h) + ';">' + fR(h) + '</div></div></div>';
+}
+function statCard(label, value, caption, color) {
+  return '<div class="card stat"><div class="lab">' + label + '</div>' +
+    '<div class="v"' + (color ? ' style="color:' + color + ';"' : '') + '>' + value + '</div>' +
+    (caption ? '<div class="c">' + caption + '</div>' : '') + '</div>';
+}
+function scaleActionHTML(s) {
+  if (s.status === 'scale') {
+    if (!s.budget) return '<div class="small" style="color:' + C_GOOD + ';font-weight:600;margin-top:4px;">Scale 9%, set budget in Meta</div>';
+    return '<div class="small" style="color:' + C_GOOD + ';font-weight:600;margin-top:4px;">$' + s.budget + ' to $' + Math.round(s.budget * 1.09) + '/day (+9%)</div>';
+  }
+  if (s.status === 'scale_back') {
+    if (!s.budget) return '<div class="small" style="color:' + C_BAD + ';font-weight:600;margin-top:4px;">Scale back 20%, set budget in Meta</div>';
+    return '<div class="small" style="color:' + C_BAD + ';font-weight:600;margin-top:4px;">$' + s.budget + ' to $' + Math.round(s.budget * 0.8) + '/day (−20%)</div>';
+  }
+  return '';
+}
+
+function rowHTML(s) {
+  var isChk = !!checked[s.key];
+  var showCb = (PAGE === 'main' && TAB === 'actions');
+  var open = !!openDetail[s.key];
+  var enc = encodeURIComponent(s.key);
+  var meta = (s.id ? 'ID ' + s.id : '') + (s.budget ? (s.id ? ' | ' : '') + '$' + s.budget + '/day' : '') + ' | ' + (isRTOffer(s.offer) ? 'Retargeting' : s.offer);
+  var h = '<div class="row">';
+  h += '<div class="row-in camp-row-inner" data-act="det" data-v="' + enc + '" style="border-left-color:' + borderFor(s.status) + ';' + (isChk ? 'opacity:.5;' : '') + '">';
+  if (showCb) h += '<div class="cb' + (isChk ? ' on' : '') + '" data-act="check" data-v="' + enc + '" role="checkbox" aria-checked="' + isChk + '" aria-label="Mark done"></div>';
+  h += '<div style="flex:1;min-width:0;">';
+  h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px;">' + badgeHTML(s.status) +
+       '<span class="small muted">' + esc(meta) + '</span></div>';
+  h += '<div class="row-name">' + esc(s.name) + '</div>';
+  h += '<div class="row-sub">' + esc(s.campaign) + '</div>';
+  h += scaleActionHTML(s);
+  if (s.isNew) h += '<div class="small muted" style="margin-top:4px;">Day ' + (s.daysLive+1) + ' of 3 | ' + (s.d7.purch > 0 ? s.d7.purch + ' sales' : 'No sales yet') + '</div>';
+  h += '<div class="camp-right-mobile" style="display:none;align-items:center;justify-content:space-between;margin-top:10px;">' + dualRoasHTML(s.d7.metaRoas, s.hy.r7) +
+       '<span class="chev' + (open ? ' open' : '') + '">⌄</span></div>';
+  h += '</div>';
+  h += '<div class="camp-right" style="display:flex;align-items:center;gap:14px;flex-shrink:0;">' + dualRoasHTML(s.d7.metaRoas, s.hy.r7) +
+       '<span class="chev' + (open ? ' open' : '') + '">⌄</span></div>';
+  h += '</div>';
+  h += '<div class="detail' + (open ? ' open' : '') + '">' + (open ? detailHTML(s) : '') + '</div>';
+  h += '</div>';
+  return h;
+}
+
+function detailHTML(s) {
+  var b = rangeFor('adset'), w = winFor(s, b.from, b.to), x = st(s.status);
+  var h = '';
+  h += '<div class="range-row" style="margin-bottom:16px;"><span class="lab" style="margin-right:4px;">Window</span>';
+  h += pillHTML('7-Day', 'as-range', 'd7', adsetRange === 'd7') + pillHTML('30-Day', 'as-range', 'd30', adsetRange === 'd30') +
+       pillHTML('Custom', 'as-range', 'custom', adsetRange === 'custom');
+  if (adsetRange === 'custom') h += '<input type="date" id="as-from" value="' + (adsetCustom.from || '') + '"><input type="date" id="as-to" value="' + (adsetCustom.to || '') + '">';
+  h += '</div>';
+
+  h += '<div class="callout" style="border-left-color:' + x.color + ';margin-bottom:16px;">';
+  h += '<div class="lab" style="color:' + x.color + ';margin-bottom:5px;">' + x.title + '</div>';
+  h += '<div style="font-size:14px;line-height:1.7;">' + esc(s.insight) + '</div></div>';
+
+  h += '<div class="card" style="padding:16px 18px;margin-bottom:14px;">';
+  h += '<div class="row-between" style="margin-bottom:10px;"><span class="lab">Daily Performance</span><div class="range-row">' +
+       pillHTML('ROAS', 'as-chart', 'roas', adsetChartTab === 'roas') + pillHTML('Spend and Revenue', 'as-chart', 'spend', adsetChartTab === 'spend') + '</div></div>';
+  h += '<div class="chart-box" style="height:190px;"><canvas id="aschart-' + encodeURIComponent(s.key) + '"></canvas></div></div>';
+
+  var wins = [['Yesterday', s.y.metaRoas, s.hy.yRoas], ['7-Day', s.d7.metaRoas, s.hy.r7], ['14-Day', s.d14.metaRoas, null], ['30-Day', s.d30.metaRoas, s.hy.r30]];
+  h += '<div class="lab" style="margin-bottom:10px;">ROAS by Window</div><div class="grid g4" style="margin-bottom:14px;">';
+  for (var i = 0; i < wins.length; i++) {
+    h += '<div class="card" style="padding:14px 10px;text-align:center;"><div class="lab" style="margin-bottom:10px;">' + wins[i][0] + '</div>';
+    h += '<div class="small muted">Meta</div><div class="num" style="font-size:20px;color:' + roasColor(wins[i][1]) + ';">' + fR(wins[i][1]) + '</div>';
+    h += '<div style="height:1px;background:' + C_LINE + ';margin:8px 0;"></div>';
+    h += '<div class="small" style="color:' + C_CORAL + ';">Hyros</div><div class="num" style="font-size:20px;color:' + roasColor(wins[i][2]) + ';">' + fR(wins[i][2]) + '</div></div>';
+  }
+  h += '</div>';
+
+  var mets = [['Spend', fC(w.spend)], ['Meta Revenue', fC(w.val > 0 ? w.val : null)], ['Hyros Revenue', fC(w.hyrosRev)],
+              ['Meta Purchases', String(Math.round(w.purch))], ['CPM', fD(w.cpm)], ['CPC', fD(w.cpc)], ['CTR', fPct(w.ctr)]];
+  if (isRTOffer(s.offer) && w.freq !== null) mets.push(['Frequency', w.freq.toFixed(2) + 'x']);
+  h += '<div class="card" style="padding:16px 18px;"><div class="lab" style="margin-bottom:12px;">Metrics</div><div class="kv-grid">';
+  for (var mi = 0; mi < mets.length; mi++) h += '<div class="kv"><div class="lab" style="font-size:9.5px;">' + mets[mi][0] + '</div><div class="v">' + mets[mi][1] + '</div></div>';
+  h += '</div></div>';
+
+  if (s.creativeAge !== null && !s.traffic) {
+    var stale = s.creativeAge >= CREATIVE_AGE_DAYS;
+    h += '<div class="callout" style="margin-top:12px;border-left-color:' + (stale ? C_WARN : C_LINE) + ';font-size:13.5px;">Newest creative added ' +
+         s.creativeAge + ' day' + (s.creativeAge === 1 ? '' : 's') + ' ago' + (stale ? '. <span style="color:' + C_WARN + ';font-weight:600;">Refresh time (3-week mark).</span>' : '.') + '</div>';
+  }
+  var pr = s.pruneKill.concat(s.pruneWatch);
+  if (pr.length) {
+    h += '<div class="card" style="margin-top:12px;padding:16px 18px;"><div class="lab" style="margin-bottom:6px;">Ad Pruning Flags, 30-Day</div>';
+    for (var pi = 0; pi < pr.length; pi++) {
+      var p = pr[pi], kill = p.sales === 0;
+      h += '<div class="prune-row small"><span style="font-weight:600;">' + esc(p.name) + '</span><span style="color:' + (kill ? C_BAD : C_WARN) + ';font-weight:600;white-space:nowrap;">' +
+           fC(p.spend) + ' | ' + p.sales + ' sales | ' + (kill ? 'Kill it' : fR(p.roas) + 'x, watch') + '</span></div>';
+    }
+    h += '</div>';
+  }
+  return h;
+}
+
+function adsEmptyState() {
+  var v = document.getElementById('view');
+  if (!ADS_LOADED) { v.innerHTML = '<div class="card empty">Loading ad data</div>'; return true; }
+  if (ADS_ERROR) {
+    var setup = /not set up|GOOGLE_SA_JSON/i.test(ADS_ERROR);
+    v.innerHTML = '<div class="card" style="padding:24px;"><div class="h-card">' + (setup ? 'Google access isn\u2019t connected yet' : 'Ad data didn\u2019t load') + '</div>' +
+      '<p style="margin-top:8px;">' + esc(ADS_ERROR) + '</p>' +
+      (setup ? '<p style="margin-top:8px;">Add the Google service account key to the scc-hq Worker in Cloudflare, then press Refresh.</p>' : '') + '</div>';
+    return true;
+  }
+  return false;
+}
+
+/* ── Ads: account view ────────────────────────────────── */
+function renderMain() {
+  if (adsEmptyState()) return;
+  var b = rangeFor('main');
+  var gScale = [], gBack = [], gOff = [], gFlag = [], gNew = [];
+  for (var a = 0; a < ADSETS.length; a++) {
+    var s0 = ADSETS[a];
+    if (s0.traffic) continue;
+    if (s0.status === 'scale') gScale.push(s0);
+    else if (s0.status === 'scale_back') gBack.push(s0);
+    else if (s0.status === 'turn_off') gOff.push(s0);
+    else if (s0.status === 'orange') gFlag.push(s0);
+    else if (s0.status === 'new_watch') gNew.push(s0);
+  }
+  var gAll = ADSETS.slice().sort(function (x, y) { return (y.firstSeen ? y.firstSeen.getTime() : 0) - (x.firstSeen ? x.firstSeen.getTime() : 0); });
+  var groups = { actions: gScale.concat(gBack).concat(gOff), flagged: gFlag, new: gNew, all: gAll };
+  var shown = groups[TAB] || gAll;
+
+  var totSpend = 0, totHyros = 0, totMeta = 0;
+  for (var q = 0; q < ADSETS.length; q++) {
+    var w = winFor(ADSETS[q], b.from, b.to);
+    totSpend += w.spend; totMeta += w.val;
+    if (w.hyrosRev !== null) totHyros += w.hyrosRev;
+  }
+  var totRoas = totSpend > 0 && totMeta > 0 ? totMeta/totSpend : null;
+  var totHyrosRoas = totSpend > 0 && totHyros > 0 ? totHyros/totSpend : null;
+
+  var h = '';
+  var soft = Object.keys(ADS_SOFT_ERRORS);
+  if (soft.length) h += '<div class="alert" style="border-color:' + C_WARN + ';">Some sources didn\u2019t load (' + esc(soft.join(', ')) + '). Numbers that depend on them may be missing.</div>';
+  for (var f = 0; f < ADSETS.length; f++) {
+    var s2 = ADSETS[f];
+    if (isRTOffer(s2.offer) && !s2.traffic && s2.d7.freq !== null && s2.d7.freq >= RT_FREQ_ALERT) {
+      h += '<div class="alert" style="border-color:' + C_WARN + ';">Retargeting frequency is at ' + s2.d7.freq.toFixed(1) + 'x (7-day). The pool is getting tired. Cut budget gradually; don\u2019t pause.</div>';
+      break;
+    }
+  }
+
+  h += '<div class="row-between" style="margin-bottom:20px;align-items:flex-end;">';
+  h += '<h1 class="h-hero">Ads</h1><div class="range-row">';
+  h += pillHTML('Yesterday', 'main-range', 'y', mainRange === 'y') + pillHTML('7-Day', 'main-range', 'd7', mainRange === 'd7') +
+       pillHTML('30-Day', 'main-range', 'd30', mainRange === 'd30') + pillHTML('Custom', 'main-range', 'custom', mainRange === 'custom');
+  if (mainRange === 'custom') h += '<input type="date" id="mn-from" value="' + (mainCustom.from || '') + '"><input type="date" id="mn-to" value="' + (mainCustom.to || '') + '">';
+  h += '</div></div>';
+
+  h += '<div class="grid g3" style="margin-bottom:12px;">';
+  h += statCard('Total Spend', fC(totSpend), null);
+  h += statCard('Revenue', fC(totMeta > 0 ? totMeta : null), 'Meta' + (totHyros > 0 ? ' | Hyros ' + fC(totHyros) : ''));
+  h += statCard('ROAS', fR(totRoas), 'Meta' + (totHyrosRoas !== null ? ' | Hyros ' + fR(totHyrosRoas) + 'x' : ''), roasColor(totRoas));
+  h += '</div>';
+  var attn = gFlag.length + gOff.length + gBack.length;
+  h += '<div class="grid g3" style="margin-bottom:20px;">';
+  h += statCard('Active Ad Sets', String(ADSETS.length), null);
+  h += statCard('Ready to Scale', String(gScale.length), null, gScale.length ? C_GOOD : null);
+  h += statCard('Need Attention', String(attn), null, attn ? ((gOff.length || gBack.length) ? C_BAD : C_WARN) : null);
+  h += '</div>';
+
+  h += '<div class="card" style="padding:18px 20px 14px;margin-bottom:28px;">';
+  h += '<div class="row-between" style="margin-bottom:12px;"><span class="h-card">Performance</span><div class="range-row">' +
+       pillHTML('Spend and Revenue', 'main-chart', 'spend', mainChartTab === 'spend') + pillHTML('ROAS', 'main-chart', 'roas', mainChartTab === 'roas') + '</div></div>';
+  h += '<div class="chart-box"><canvas id="main-chart"></canvas></div></div>';
+
+  h += '<h2 class="h-sec" style="margin-bottom:12px;">Offers</h2>';
+  var cols = OFFERS.length >= 4 ? 4 : (OFFERS.length || 1);
+  h += '<div class="grid" style="grid-template-columns:repeat(' + cols + ',minmax(0,1fr));margin-bottom:32px;" id="offer-grid">';
+  for (var o = 0; o < OFFERS.length; o++) {
+    var od2 = OFFERS[o], os = offerStats(od2.key, b.from, b.to);
+    var showRoas = os.metaRoas !== null ? os.metaRoas : os.roas;
+    h += '<div class="card offer-card" data-act="offer" data-v="' + encodeURIComponent(od2.key) + '" tabindex="0" role="button">';
+    h += '<div class="eyebrow" style="' + (od2.rt ? 'color:' + C_DUSTY + ';' : '') + 'letter-spacing:2px;line-height:1.4;min-height:30px;">' + (od2.rt ? 'Retargeting | ' : '') + esc(od2.label) + '</div>';
+    h += '<div class="num" style="font-size:30px;line-height:1.1;margin:8px 0 4px;color:' + roasColor(showRoas) + ';">' + fR(showRoas) + '</div>';
+    h += '<div class="small">Meta ROAS on ' + fC(os.spend) + ' spend</div>';
+    h += '<div class="small muted" style="margin-top:2px;">' + os.sets.length + ' ad set' + (os.sets.length === 1 ? '' : 's') + '</div></div>';
+  }
+  h += '</div>';
+
+  var counts = { actions: groups.actions.length, flagged: groups.flagged.length, new: groups.new.length, all: groups.all.length };
+  var tabDefs = [['actions',"Today\u2019s Actions"],['flagged','Orange Flags'],['new','New'],['all','All Ad Sets']];
+  var headings = { actions:"Today\u2019s Action Items", flagged:'Monitor Daily, No Hasty Calls', new:'New Ad Sets Under Watch', all:'All Ad Sets' };
+  h += '<div class="row-between" style="margin-bottom:12px;"><h2 class="h-sec">' + headings[TAB] + '</h2><div class="range-row">';
+  for (var t = 0; t < tabDefs.length; t++) h += pillHTML(tabDefs[t][1] + ' (' + counts[tabDefs[t][0]] + ')', 'tab', tabDefs[t][0], TAB === tabDefs[t][0]);
+  h += '</div></div>';
+
+  h += '<div class="card list">';
+  if (!shown.length) h += '<div class="empty">Nothing here today.</div>';
+  else for (var r2 = 0; r2 < shown.length; r2++) h += rowHTML(shown[r2]);
+  h += '</div>';
+
+  document.getElementById('view').innerHTML = h;
+  if (window.innerWidth <= 720) { var og = document.getElementById('offer-grid'); if (og) og.style.gridTemplateColumns = 'repeat(2,minmax(0,1fr))'; }
+  drawLineChart('main-chart', dailySeries(ADSETS, b.from, b.to), mainChartTab, 'main');
+  redrawOpenDetails();
+}
+
+/* ── Ads: offer view ──────────────────────────────────── */
+function renderOffer() {
+  if (adsEmptyState()) return;
+  var od = offerDef(CUR_OFFER);
+  if (!od) { PAGE = 'main'; return renderMain(); }
+  var b = rangeFor('offer'), s = offerStats(od.key, b.from, b.to);
+  var h = '<button class="linklab" data-act="back" style="margin-bottom:14px;">Back to all offers</button>';
+  h += '<div class="row-between" style="margin-bottom:18px;align-items:flex-end;">';
+  h += '<div>' + (od.rt ? '<div class="eyebrow">Retargeting</div>' : '') + '<h1 class="h-hero" style="margin-top:' + (od.rt ? '8' : '0') + 'px;">' + esc(od.label) + '</h1></div><div class="range-row">';
+  h += pillHTML('7-Day', 'of-range', 'd7', offerRange === 'd7') + pillHTML('30-Day', 'of-range', 'd30', offerRange === 'd30') + pillHTML('Custom', 'of-range', 'custom', offerRange === 'custom');
+  if (offerRange === 'custom') h += '<input type="date" id="of-from" value="' + (offerCustom.from || '') + '"><input type="date" id="of-to" value="' + (offerCustom.to || '') + '">';
+  h += '</div></div>';
+
+  if (s.totalSets > 0 && s.matchedSets < s.totalSets)
+    h += '<div class="alert" style="border-color:' + C_WARN + ';">Hyros matched ' + s.matchedSets + ' of ' + s.totalSets + ' ad sets here. Unmatched ones use an estimate. Check that the Hyros report uses the same ad set names.</div>';
+  if (offerRange === 'custom')
+    h += '<div class="alert" style="border-color:' + C_LINE + ';">Custom ranges use estimated Hyros revenue. 7-day and 30-day use exact Hyros figures.</div>';
+
+  var cap = offerRange === 'd7' ? 'Last 7 days' : (offerRange === 'd30' ? 'Last 30 days' : 'Custom range');
+  h += '<div class="grid g4" style="margin-bottom:14px;">';
+  h += statCard('Ad Spend', fC(s.spend), cap);
+  h += statCard('Revenue', fC(s.rev), 'Meta attributed' + (s.hyrosRev !== null ? ' | Hyros ' + fC(s.hyrosRev) : ''));
+  h += statCard('ROAS', s.roas !== null ? fR(s.roas) + 'x' : '–', 'Meta' + (s.hyrosRoas !== null ? ' | Hyros ' + fR(s.hyrosRoas) + 'x' : ''), roasColor(s.roas));
+  h += statCard('Profit', fC(s.profit), 'Meta revenue minus spend', s.profit !== null ? (s.profit >= 0 ? C_GOOD : C_BAD) : null);
+  h += '</div>';
+
+  h += '<div class="offer-lower" style="display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:28px;">';
+  h += '<div class="card" style="padding:18px 20px 14px;"><div class="row-between" style="margin-bottom:12px;"><span class="h-card">Offer Performance</span><div class="range-row">' +
+       pillHTML('Spend and Revenue', 'of-chart', 'spend', offerChartTab === 'spend') + pillHTML('ROAS', 'of-chart', 'roas', offerChartTab === 'roas') + '</div></div>';
+  h += '<div class="chart-box" style="height:230px;"><canvas id="offer-chart"></canvas></div></div>';
+
+  h += '<div style="display:flex;flex-direction:column;gap:12px;">';
+  h += '<div class="card" style="padding:16px;display:flex;justify-content:space-around;gap:16px;">';
+  h += '<div style="text-align:center;"><div class="lab">AOV</div><div class="num" style="font-size:24px;">' + (s.aov !== null ? '$' + Math.round(s.aov) : '–') + '</div></div>';
+  h += '<div style="text-align:center;"><div class="lab">Cost per Buyer</div><div class="num" style="font-size:24px;">' + (s.cpb !== null ? '$' + Math.round(s.cpb) : '–') + '</div></div></div>';
+  h += '<div class="card" style="padding:16px;flex:1;"><div class="row-between" style="margin-bottom:4px;"><span class="lab">Product</span><span class="lab">Units | Conv.</span></div>';
+  if (!s.products.length) {
+    h += '<p class="small" style="padding:8px 0;line-height:1.6;">No purchase data yet. Add a Purchases tab to the Meta sheet with Date, Order ID, Product, Amount (one row per line item). Bump and upsell rates calculate from orders automatically.</p>';
+  } else {
+    for (var p = 0; p < s.products.length; p++) {
+      var pr = s.products[p], roleLab = { main:'Main Offer', bump:'Bump', upsell:'Upsell' }[pr.role] || pr.role;
+      var conv = (pr.role !== 'main' && s.mainUnits > 0) ? Math.round((pr.units / s.mainUnits) * 100) : null;
+      h += '<div class="prod-row"><div style="min-width:0;"><span style="font-weight:600;font-size:13.5px;">' + roleLab + '</span><span class="small"> | ' + esc(pr.product) + '</span></div>' +
+           '<div style="display:flex;gap:14px;align-items:center;flex-shrink:0;"><span class="num" style="font-size:17px;">' + pr.units + '</span>' +
+           '<span class="small" style="width:36px;text-align:right;">' + (conv !== null ? conv + '%' : '') + '</span></div></div>';
+    }
+  }
+  h += '</div></div></div>';
+
+  h += '<h2 class="h-sec" style="margin-bottom:12px;">Ad Sets</h2><div class="card list">';
+  if (!s.sets.length) h += '<div class="empty">No active ad sets for this offer.</div>';
+  else {
+    var order = { scale:0, scale_back:1, turn_off:1, orange:2, new_watch:3, hold:4, traffic:5 };
+    var sorted = s.sets.slice().sort(function (x, y) { return (order[x.status] === undefined ? 9 : order[x.status]) - (order[y.status] === undefined ? 9 : order[y.status]); });
+    for (var s3 = 0; s3 < sorted.length; s3++) h += rowHTML(sorted[s3]);
+  }
+  h += '</div>';
+  document.getElementById('view').innerHTML = h;
+  drawLineChart('offer-chart', dailySeries(s.sets, b.from, b.to), offerChartTab, 'offer');
+  redrawOpenDetails();
+}
+
+function redrawOpenDetails() {
+  for (var k in openDetail) {
+    if (!openDetail.hasOwnProperty(k) || !openDetail[k]) continue;
+    var s = null;
+    for (var i = 0; i < ADSETS.length; i++) if (ADSETS[i].key === k) s = ADSETS[i];
+    if (!s) continue;
+    var b = rangeFor('adset');
+    drawLineChart('aschart-' + encodeURIComponent(s.key), dailySeries([s], b.from, b.to), adsetChartTab, 'as-' + k);
+  }
+}
+
+/* ── Events ───────────────────────────────────────────── */
+document.addEventListener('click', function (e) {
+  var t = e.target.closest ? e.target.closest('[data-act]') : null;
+  if (!t) return;
+  var act = t.getAttribute('data-act'), v = t.getAttribute('data-v');
+  if (act === 'hq-tab') { HQ_TAB = v; try { sessionStorage.setItem('scc-hq-tab', v); } catch (x) {} window.scrollTo(0, 0); render(); return; }
+  if (act === 'inbox-filter') { inboxFilter = v; render(); return; }
+  if (act === 'toggle-snoozed') { showSnoozed = !showSnoozed; render(); return; }
+  if (act === 'note-more') { expandedNotes[v] = !expandedNotes[v]; render(); return; }
+  if (act === 'note-set') { setNoteStatus(v, t.getAttribute('data-s'), t); return; }
+  if (act === 'check') { e.stopPropagation(); var ck = decodeURIComponent(v); checked[ck] = !checked[ck]; saveChecked(); render(); return; }
+  if (act === 'det') { var dk2 = decodeURIComponent(v); openDetail[dk2] = !openDetail[dk2]; render(); return; }
+  if (act === 'tab') TAB = v;
+  else if (act === 'offer') { PAGE = 'offer'; CUR_OFFER = decodeURIComponent(v); openDetail = {}; window.scrollTo(0, 0); }
+  else if (act === 'back') { PAGE = 'main'; CUR_OFFER = null; openDetail = {}; }
+  else if (act === 'main-range') mainRange = v;
+  else if (act === 'of-range') offerRange = v;
+  else if (act === 'as-range') adsetRange = v;
+  else if (act === 'main-chart') mainChartTab = v;
+  else if (act === 'of-chart') offerChartTab = v;
+  else if (act === 'as-chart') adsetChartTab = v;
+  else return;
+  render();
+});
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Enter') return;
+  var t = e.target;
+  if (t && t.classList && t.classList.contains('offer-card')) t.click();
+});
+document.addEventListener('change', function (e) {
+  var id = e.target.id, f, t2;
+  if (id === 'mn-from' || id === 'mn-to') { f = document.getElementById('mn-from'); t2 = document.getElementById('mn-to'); if (f && t2 && f.value && t2.value) { mainCustom = { from:f.value, to:t2.value }; render(); } }
+  if (id === 'of-from' || id === 'of-to') { f = document.getElementById('of-from'); t2 = document.getElementById('of-to'); if (f && t2 && f.value && t2.value) { offerCustom = { from:f.value, to:t2.value }; render(); } }
+  if (id === 'as-from' || id === 'as-to') { f = document.getElementById('as-from'); t2 = document.getElementById('as-to'); if (f && t2 && f.value && t2.value) { adsetCustom = { from:f.value, to:t2.value }; render(); } }
+});
+
+/* ── Loading ──────────────────────────────────────────── */
+function loadAds(fresh) {
+  return api('/api/sheets' + (fresh ? '?fresh=1' : '')).then(function (j) {
+    ADS_LOADED = true;
+    if (!j.ok) { ADS_ERROR = j.fatal || j.error || 'Could not load the Meta sheet.'; return; }
+    ADS_ERROR = null;
+    ADS_SOFT_ERRORS = j.errors || {};
+    var d = j.data || {};
+    metaRows = d.meta || [];
+    hyrosY = parseHyrosWindow(d.hyrosY); hyros7 = parseHyrosWindow(d.hyros7); hyros30 = parseHyrosWindow(d.hyros30);
+    hyrosDailyMap = parseHyrosDaily(d.hyrosDaily);
+    productRows = parseProducts(d.products); purchaseRows = parsePurchases(d.purchases);
+    var built = buildAdsets(), active = [];
+    for (var i = 0; i < built.length; i++) if (winFor(built[i], daysAgo(1), todayMid()).spend > 0) active.push(built[i]);
+    ADSETS = enrich(active);
+    OFFERS = buildOffers();
+  }).catch(function (e) {
+    if (e.message === 'auth') throw e;
+    ADS_LOADED = true; ADS_ERROR = 'Could not reach the server.';
+  });
+}
+function refreshAll(fresh) {
+  setSync('Syncing');
+  return Promise.all([loadAds(fresh), loadInbox()]).then(function () {
+    var bad = ADS_ERROR || INBOX.error;
+    setSync(bad ? 'Needs setup' : 'Live ' + new Date().toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' }), !!bad);
+    render();
+  }).catch(function () {});
+}
+function loadBrand() {
+  fetch(API + '/api/brand').then(function (r) { return r.json(); }).then(function (j) {
+    if (j && j.logo) { var l = document.getElementById('logo'); l.src = j.logo; l.style.display = 'block'; }
+  }).catch(function () {});
+}
+
+var booted = false;
+function startApp() {
+  document.getElementById('login').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  if (!HQ_TAB) { try { HQ_TAB = sessionStorage.getItem('scc-hq-tab'); } catch (e) {} }
+  var firstOpen = !HQ_TAB;
+  if (!HQ_TAB) HQ_TAB = 'ads';
+  render();
+  refreshAll(false).then(function () {
+    /* On a fresh open, lead with Notifications when something needs Rebecca */
+    if (firstOpen && needsYouCount() > 0) { HQ_TAB = 'notifications'; render(); }
+  });
+  if (!booted) {
+    booted = true;
+    loadBrand();
+    setInterval(function () { if (getToken()) refreshAll(false); }, 15 * 60 * 1000);
+    setInterval(function () { if (getToken()) loadInbox().then(render).catch(function () {}); }, 5 * 60 * 1000);
+  }
+}
+document.getElementById('refresh-btn').addEventListener('click', function () { refreshAll(true); });
+
+/* Showit embed auto-height */
+function broadcastHeight() {
+  try { window.parent.postMessage({ type:'scc-resize', height: document.documentElement.scrollHeight }, '*'); } catch (e) {}
+}
+window.addEventListener('load', broadcastHeight);
+window.addEventListener('resize', broadcastHeight);
+
+checked = loadChecked();
+if (getToken()) startApp(); else showLogin();
+</script>
+</body>
+</html>
