@@ -270,7 +270,7 @@ function needsYouCount() {
 }
 function renderNav() {
   var n = needsYouCount();
-  var tabs = [['notifications', 'Notifications', n], ['ads', 'Ads', null]];
+  var tabs = [['notifications', 'Notifications', n], ['ads', 'Ads', null], ['attribution', 'Attribution', null]];
   var h = '';
   for (var i = 0; i < tabs.length; i++) {
     var on = HQ_TAB === tabs[i][0];
@@ -287,6 +287,7 @@ function setSync(text, isErr) {
 function render() {
   renderNav();
   if (HQ_TAB === 'notifications') renderNotifications();
+  else if (HQ_TAB === 'attribution') { if (window.ATTR) ATTR.render(); }
   else if (PAGE === 'offer') renderOffer();
   else renderMain();
   setTimeout(broadcastHeight, 120);
@@ -1384,5 +1385,6 @@ window.addEventListener('resize', broadcastHeight);
 checked = loadChecked();
 if (getToken()) startApp(); else showLogin();
 </script>
+<script src="attribution.js"></script>
 </body>
 </html>
